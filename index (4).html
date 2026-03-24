@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aravind Kannappan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #111;
+      --paper: #f7f5f0;
+      --cream: #ede9e0;
+      --muted: #7a7570;
+      --accent: #c0392b;
+      --rule: rgba(0,0,0,0.10);
+      --serif: 'DM Serif Display', Georgia, serif;
+      --mono: 'DM Mono', 'Fira Code', monospace;
+      --sans: 'DM Sans', -apple-system, sans-serif;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      font-family: var(--sans);
+      background: var(--paper);
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #app { display: flex; flex-direction: column; width: 100%; height: 100vh; overflow: hidden; }
+
+    #nav {
+      flex-shrink: 0; width: 100%; height: 54px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 48px; border-bottom: 1px solid var(--rule);
+      background: var(--paper);
+      transform: translateY(-100%); opacity: 0;
+      transition: transform 0.7s cubic-bezier(0.22,1,0.36,1), opacity 0.7s ease;
+      z-index: 10;
+    }
+    #nav.show { transform: translateY(0); opacity: 1; }
+    .nav-name { font-family: var(--serif); font-size: 1.05rem; letter-spacing: 0.01em; text-decoration: none; color: var(--ink); }
+    .nav-links { display: flex; gap: 28px; list-style: none; }
+    .nav-links a { font-size: 0.76rem; font-weight: 500; color: var(--muted); text-decoration: none; letter-spacing: 0.07em; text-transform: uppercase; transition: color 0.15s; }
+    .nav-links a:hover { color: var(--ink); }
+
+    #layout { display: flex; flex: 1; min-height: 0; width: 100%; }
+
+    #left { flex: 0 0 48%; display: flex; flex-direction: column; position: relative; overflow: hidden; border-right: 1px solid var(--rule); }
+    #content-area { flex: 1; position: relative; overflow: hidden; }
+
+    #terminal-wrap {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: flex-start;
+      padding: 0 48px;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    #terminal-wrap.hide { opacity: 0; transform: translateY(-12px); pointer-events: none; }
+    #terminal { font-family: var(--mono); font-size: 1.02rem; line-height: 2.1; color: var(--ink); }
+    .t-line { display: block; white-space: pre; }
+    .t-ok { color: #2d7a2d; font-weight: 500; }
+    .t-gray { color: var(--muted); }
+    .cursor { display: inline-block; width: 2px; height: 1.1em; background: var(--accent); vertical-align: text-bottom; animation: blink 0.9s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .t-hint { display: flex; align-items: center; gap: 12px; margin-top: 24px; font-size: 0.7rem; color: #bbb; letter-spacing: 0.06em; font-family: var(--mono); }
+    .t-hint .key { display: inline-flex; align-items: center; justify-content: center; padding: 2px 10px; height: 22px; border: 1px solid #ccc; border-radius: 3px; font-size: 0.66rem; color: #999; }
+    .t-skip { font-family: var(--sans); font-size: 0.73rem; font-weight: 500; color: var(--accent); background: none; border: none; cursor: pointer; padding: 0; transition: opacity 0.2s; }
+    .t-skip:hover { opacity: 0.7; }
+    .t-skip.hide { display: none; }
+
+    #bio-wrap {
+      position: absolute; inset: 0;
+      overflow-y: auto; overflow-x: hidden;
+      scroll-snap-type: y mandatory; scroll-behavior: smooth;
+      opacity: 0; transform: translateY(14px);
+      transition: opacity 0.6s ease 0.15s, transform 0.6s ease 0.15s;
+      pointer-events: none; scrollbar-width: none;
+    }
+    #bio-wrap::-webkit-scrollbar { display: none; }
+    #bio-wrap.show { opacity: 1; transform: none; pointer-events: auto; }
+
+    .bio-intro {
+      min-height: 100%; scroll-snap-align: start; scroll-snap-stop: always;
+      display: flex; flex-direction: column; justify-content: center;
+      padding: 48px 48px 64px; box-sizing: border-box;
+    }
+
+    .bio-eyebrow { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+    .bio-name { font-family: var(--serif); font-size: clamp(2.2rem, 3.2vw, 3rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.08; margin-bottom: 28px; }
+    .bio-para { font-size: 0.92rem; line-height: 1.85; color: #333; margin-bottom: 12px; font-weight: 300; }
+    .bio-para a { color: var(--ink); text-decoration: none; border-bottom: 1px solid rgba(0,0,0,0.22); transition: opacity 0.15s; }
+    .bio-para a:hover { opacity: 0.45; }
+
+    .bio-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 18px; }
+    .bio-tag { font-family: var(--mono); font-size: 0.63rem; color: var(--muted); background: var(--cream); border: 1px solid var(--rule); padding: 3px 8px; border-radius: 2px; }
+
+    .bio-links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 26px; align-items: center; }
+    .btn { display: inline-flex; align-items: center; padding: 8px 16px; border-radius: 2px; font-family: var(--mono); font-size: 0.7rem; text-decoration: none; letter-spacing: 0.04em; transition: all 0.18s; border: 1px solid transparent; cursor: pointer; }
+    .btn-dark { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+    .btn-dark:hover { background: #333; }
+    .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 2px; border: 1px solid var(--rule); color: var(--ink); text-decoration: none; background: var(--cream); transition: all 0.18s; }
+    .icon-btn:hover { border-color: var(--ink); }
+    .icon-btn svg { width: 15px; height: 15px; display: block; }
+
+    .bio-section {
+      min-height: 100%; scroll-snap-align: start; scroll-snap-stop: always;
+      padding: 48px 48px 64px; position: relative; box-sizing: border-box;
+      display: flex; flex-direction: column; justify-content: center;
+    }
+    .bio-section::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--rule); }
+    .bio-section-title { font-family: var(--serif); font-size: clamp(1.9rem, 2.8vw, 2.6rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.08; color: var(--ink); margin-bottom: 28px; }
+
+    .bio-section-list { list-style: none; }
+
+    #blog-section .bio-section-list li { margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--rule); }
+    #blog-section .bio-section-list li:last-child { border-bottom: none; margin-bottom: 0; }
+    #blog-section .item-title { font-family: var(--serif); font-size: 0.98rem; font-weight: 400; margin-bottom: 4px; }
+    #blog-section .item-title a { color: var(--ink); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.15s; }
+    #blog-section .item-title a:hover { border-bottom-color: var(--ink); }
+    #blog-section .item-meta { font-family: var(--mono); font-size: 0.63rem; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 6px; }
+    #blog-section .item-desc { font-size: 0.81rem; line-height: 1.65; color: #555; font-weight: 300; }
+
+    #experience-section .bio-section-list li { margin-bottom: 17px; padding-bottom: 17px; border-bottom: 1px solid var(--rule); }
+    #experience-section .bio-section-list li:last-child { border-bottom: none; }
+    #experience-section .item-title { font-size: 0.87rem; font-weight: 600; margin-bottom: 3px; }
+    #experience-section .item-meta { font-family: var(--mono); font-size: 0.64rem; color: var(--muted); letter-spacing: 0.04em; margin-bottom: 5px; }
+    #experience-section .item-desc { font-size: 0.81rem; line-height: 1.55; color: #555; font-weight: 300; }
+
+    #projects-section .bio-section-list li { margin-bottom: 17px; padding-bottom: 17px; border-bottom: 1px solid var(--rule); }
+    #projects-section .bio-section-list li:last-child { border-bottom: none; }
+    #projects-section .proj-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+    #projects-section .item-title { font-size: 0.87rem; font-weight: 600; }
+    #projects-section .item-title a { color: var(--ink); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.15s; }
+    #projects-section .item-title a:hover { border-bottom-color: var(--ink); }
+    #projects-section .item-meta { font-family: var(--mono); font-size: 0.63rem; color: var(--accent); letter-spacing: 0.04em; }
+    #projects-section .item-desc { font-size: 0.81rem; line-height: 1.55; color: #555; font-weight: 300; margin-bottom: 8px; }
+    #projects-section .item-skills { display: flex; flex-wrap: wrap; gap: 4px; }
+    #projects-section .project-skill { font-family: var(--mono); font-size: 0.61rem; color: var(--muted); background: var(--cream); border: 1px solid var(--rule); padding: 2px 7px; border-radius: 2px; }
+
+    .show-more-btn { background: none; border: none; font-family: var(--mono); font-size: 0.7rem; color: var(--muted); cursor: pointer; padding: 10px 0; margin-top: 6px; letter-spacing: 0.04em; text-decoration: underline; text-underline-offset: 3px; transition: color 0.15s; }
+    .show-more-btn:hover { color: var(--ink); }
+    .show-more-btn.hidden { display: none; }
+
+    #site-footer { padding: 24px 48px 48px; border-top: 1px solid var(--rule); scroll-snap-align: start; }
+    .footer-line { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.03em; }
+    .footer-line a { color: var(--muted); text-decoration: none; border-bottom: 1px solid transparent; transition: color 0.15s, border-color 0.15s; }
+    .footer-line a:hover { color: var(--ink); border-bottom-color: var(--ink); }
+
+    /* ── RIGHT PANEL: Loss landscape ── */
+    #right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: stretch;
+      position: relative;
+      background: var(--paper);
+      overflow: hidden;
+    }
+
+    #landscape-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+
+    #landscape-ui {
+      position: absolute;
+      bottom: 20px;
+      left: 0; right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    #loss-readout {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: rgba(0,0,0,0.28);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    #landscape-controls {
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .ctrl-btn {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.06em;
+      color: rgba(0,0,0,0.4);
+      background: rgba(247,245,240,0.85);
+      border: 1px solid rgba(0,0,0,0.12);
+      border-radius: 2px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      backdrop-filter: blur(4px);
+    }
+    .ctrl-btn:hover { color: var(--ink); border-color: rgba(0,0,0,0.35); }
+
+    @media (max-width: 720px) {
+      #layout { flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+      #right { order: -1; flex: 0 0 auto; height: 40vh; min-height: 260px; border-bottom: 1px solid var(--rule); }
+      #left { order: 0; flex: 0 0 auto; overflow: visible; border-right: none; }
+      #content-area { overflow: visible; }
+      #terminal-wrap { position: relative; min-height: 100%; align-items: flex-start; padding-top: 24px; padding-bottom: 48px; }
+      #terminal-wrap.hide { position: absolute; height: 0; overflow: hidden; padding: 0; }
+      #bio-wrap { position: absolute; height: 0; overflow: hidden; pointer-events: none; }
+      #bio-wrap.show { position: relative; height: auto; overflow: visible; pointer-events: auto; scroll-snap-type: none; }
+      .bio-intro, .bio-section { min-height: 0; }
+      .bio-intro, .bio-section, #site-footer { padding-left: 20px; padding-right: 20px; }
+      #nav { padding: 0 20px; }
+      .nav-links { gap: 16px; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <nav id="nav">
+    <a class="nav-name" href="#">Aravind Kannappan</a>
+    <ul class="nav-links">
+      <li><a href="#blog-section">Blog</a></li>
+      <li><a href="#experience-section">Experience</a></li>
+      <li><a href="#projects-section">Projects</a></li>
+      <li><a href="mailto:ak10150@nyu.edu">Contact</a></li>
+    </ul>
+  </nav>
+
+  <div id="layout">
+    <div id="left">
+      <div id="content-area">
+
+        <div id="terminal-wrap">
+          <div id="terminal" aria-live="polite">
+            <span class="t-line" id="tl0"></span>
+            <span class="t-line" id="tl1"></span>
+            <span class="t-line" id="tl2"></span>
+            <span class="t-line" id="tl3"></span>
+            <span class="t-line" id="tl4"></span>
+            <span class="t-line" id="tl5"></span>
+            <div class="t-hint" id="t-hint" style="opacity:0;transition:opacity 0.5s">
+              <span class="key">↵ enter</span>
+              <button type="button" class="t-skip" id="t-skip">skip →</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="bio-wrap">
+
+          <div class="bio-intro" id="bio-intro">
+            <p class="bio-eyebrow">MS Applied Statistics · NYU · New York</p>
+            <h1 class="bio-name">Aravind<br>Kannappan</h1>
+            <p class="bio-para">ML researcher and engineer at the intersection of AI safety, Bayesian statistics, and applied deep learning. Currently a research intern at NYU Grossman School of Medicine and a fellow at the Supervised Program for Alignment Research.</p>
+            <p class="bio-para">Previously founded <a href="https://synthure.vercel.app/" target="_blank" rel="noopener">Synthure</a> (clinical LLM) and currently building <a href="https://replays-ai.vercel.app/" target="_blank" rel="noopener">Replays AI</a> (AI sports commentary). Open to relocation.</p>
+            <div class="bio-tags">
+              <span class="bio-tag">AI Safety</span>
+              <span class="bio-tag">Bayesian Methods</span>
+              <span class="bio-tag">NLP</span>
+              <span class="bio-tag">Computer Vision</span>
+              <span class="bio-tag">Genomics</span>
+              <span class="bio-tag">Reinforcement Learning</span>
+              <span class="bio-tag">PyTorch</span>
+              <span class="bio-tag">CUDA</span>
+            </div>
+            <div class="bio-links">
+              <button type="button" class="btn btn-dark" id="copy-email-btn">copy email</button>
+              <a class="icon-btn" href="https://github.com/aravinds-kannappan" target="_blank" rel="noopener" title="GitHub">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48v-1.69c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.93 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0112 6.84c.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.83-2.34 4.68-4.57 4.92.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0022 12c0-5.52-4.48-10-10-10z"/></svg>
+              </a>
+              <a class="icon-btn" href="https://www.linkedin.com/in/aravindkannappan" target="_blank" rel="noopener" title="LinkedIn">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.37V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 110-4.12 2.06 2.06 0 010 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45C23.2 24 24 23.23 24 22.27V1.73C24 .77 23.2 0 22.22 0z"/></svg>
+              </a>
+              <a class="icon-btn" href="tel:+14085915449" title="Call">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+              </a>
+            </div>
+          </div>
+
+          <!-- BLOG -->
+          <section class="bio-section" id="blog-section" aria-label="Technical Blog">
+            <h2 class="bio-section-title">Technical Blog</h2>
+            <ul class="bio-section-list">
+              <li>
+                <div class="item-title"><a href="#" target="_blank" rel="noopener">Chess, Minimax & Alpha-Beta Pruning: A Graph-Theoretic ML Lens</a></div>
+                <div class="item-meta">Algorithms · Game Theory · Search Trees</div>
+                <div class="item-desc">Chess as a DAG with branching factor ~35. We derive the minimax recurrence, prove the α-β pruning bound O(b^(d/2)), and draw the line from expectiminimax to MCTS — the backbone of AlphaZero's policy rollouts.</div>
+              </li>
+              <li>
+                <div class="item-title"><a href="#" target="_blank" rel="noopener">The Spectral View of Gradient Descent: Why Conditioning Beats Learning Rate Tuning</a></div>
+                <div class="item-meta">Optimization · Linear Algebra · Deep Learning Theory</div>
+                <div class="item-desc">Eigendecompose the Hessian ∇²L to show why ill-conditioned landscapes stall training. We derive the condition number κ = λ_max/λ_min, its effect on the optimal step size, and why Adam's per-parameter scaling is implicit preconditioning.</div>
+              </li>
+              <li>
+                <div class="item-title"><a href="#" target="_blank" rel="noopener">Markov Chains on Traffic Networks: Stochastic Matrices, Stationarity & PageRank</a></div>
+                <div class="item-meta">Probability · Graph Theory · Applied Statistics</div>
+                <div class="item-desc">Model urban intersections as a finite Markov chain. Prove existence of stationary distribution π via Perron-Frobenius, derive its equivalence to Google's PageRank, and bound mixing time — directly relevant to real-time routing algorithms.</div>
+              </li>
+              <li>
+                <div class="item-title"><a href="#" target="_blank" rel="noopener">Variational Inference as Optimization: KL Divergence, the ELBO, and Why VAEs Work</a></div>
+                <div class="item-meta">Bayesian Methods · Information Theory · Generative Models</div>
+                <div class="item-desc">Derive the ELBO from Jensen's inequality: log p(x) ≥ E_q[log p(x,z)] − KL(q‖p). Cover the reparameterization trick as a variance reduction method, posterior collapse, and the β-VAE KL annealing fix.</div>
+              </li>
+              <li>
+                <div class="item-title"><a href="#" target="_blank" rel="noopener">Suffix Arrays, BWT & Sequence Alignment: When Algorithms Meet Genomics</a></div>
+                <div class="item-meta">String Algorithms · Bioinformatics · Computational Biology</div>
+                <div class="item-desc">The Burrows-Wheeler Transform as lossless compression with O(n) suffix array construction. Show how BWA-MEM exploits BWT to align reads to a 3B base-pair genome in sublinear expected time, and why this underpins modern variant calling.</div>
+              </li>
+            </ul>
+          </section>
+
+          <!-- EXPERIENCE -->
+          <section class="bio-section" id="experience-section" aria-label="Experience">
+            <h2 class="bio-section-title">Experience</h2>
+            <ul class="bio-section-list">
+              <li>
+                <div class="item-title">ML Research Intern</div>
+                <div class="item-meta">NYU Grossman School of Medicine · Feb 2026 – Present · New York, NY</div>
+                <div class="item-desc">Trained VAE and transformer models in PyTorch to predict functional variant effects across 100+ genomic tracks. Developed hierarchical Bayesian VI integrating ATAC-seq and ChIP-seq signals. AUROC 0.83 on eQTL prediction, +11% over LASSO.</div>
+              </li>
+              <li>
+                <div class="item-title">AI Safety Research Fellow</div>
+                <div class="item-meta">Supervised Program for Alignment Research · Feb 2026 – Present · Remote</div>
+                <div class="item-desc">Designed evidence-weighted evaluation frameworks. Implemented simulation-based inference with Set Transformers over 500K trajectories. Applied mechanistic interpretability across 70M–12B parameter models to identify confidence divergence and error modes.</div>
+              </li>
+              <li>
+                <div class="item-title">Software Engineer AI/ML · Technical Lead</div>
+                <div class="item-meta">Replays AI · Sep 2025 – Present · New York, NY</div>
+                <div class="item-desc">Built LLM-based sports commentary system (+45% engagement). Designed RAG pipeline over 5M+ events with hybrid sparse/dense retrieval. Reduced inference latency 850ms → 340ms via INT8 quantization and KV-cache reuse at 10K+ scale.</div>
+              </li>
+              <li>
+                <div class="item-title">Founder & CTO</div>
+                <div class="item-meta">Synthure · Jun 2023 – Jul 2025</div>
+                <div class="item-desc">Clinical LLM over 60K patient records. Reduced hallucination rate 81% → 13% via SFT + RLHF. Domain-specific entity recognition cut policy misinterpretation by 94%. Measured bias across protected classes to ±5% variance.</div>
+              </li>
+            </ul>
+          </section>
+
+          <!-- PROJECTS -->
+          <section class="bio-section" id="projects-section" aria-label="Projects">
+            <h2 class="bio-section-title">Projects</h2>
+            <ul class="bio-section-list">
+              <li>
+                <div class="proj-header">
+                  <div class="item-title"><a href="https://github.com/aravinds-kannappan" target="_blank" rel="noopener">GameNGen</a></div>
+                  <div class="item-meta">Generative Models · Game AI</div>
+                </div>
+                <div class="item-desc">Real-time neural game engine. Replicates DOOM gameplay frame-by-frame using a diffusion model trained on game trajectories — no explicit game logic, pure learned simulation.</div>
+                <div class="item-skills">
+                  <span class="project-skill">PyTorch</span><span class="project-skill">Diffusion</span><span class="project-skill">RL</span><span class="project-skill">CUDA</span>
+                </div>
+              </li>
+              <li>
+                <div class="proj-header">
+                  <div class="item-title"><a href="https://github.com/aravinds-kannappan" target="_blank" rel="noopener">Volatility Alchemist</a></div>
+                  <div class="item-meta">Quantitative Finance · Time Series</div>
+                </div>
+                <div class="item-desc">Options volatility surface modeling with GARCH, stochastic vol models, and ML-based regime detection. Calibrates implied vol surfaces to market data and forecasts realized volatility across regimes.</div>
+                <div class="item-skills">
+                  <span class="project-skill">Python</span><span class="project-skill">GARCH</span><span class="project-skill">Time Series</span><span class="project-skill">XGBoost</span>
+                </div>
+              </li>
+              <li>
+                <div class="proj-header">
+                  <div class="item-title"><a href="https://github.com/aravinds-kannappan" target="_blank" rel="noopener">Traffic Flow Optimization</a></div>
+                  <div class="item-meta">Reinforcement Learning · Graph Theory</div>
+                </div>
+                <div class="item-desc">RL agent for adaptive traffic signal control modeled as an MDP over a city graph. PPO-trained, outperforming fixed-time baselines by 23% in average wait reduction across simulated intersections.</div>
+                <div class="item-skills">
+                  <span class="project-skill">PPO</span><span class="project-skill">GNN</span><span class="project-skill">PyTorch</span><span class="project-skill">Simulation</span>
+                </div>
+              </li>
+              <li>
+                <div class="proj-header">
+                  <div class="item-title"><a href="https://github.com/aravinds-kannappan" target="_blank" rel="noopener">RobustSight</a></div>
+                  <div class="item-meta">AI Safety · Computer Vision</div>
+                </div>
+                <div class="item-desc">Evaluation framework for CV model safety and alignment. Benchmarks adversarial robustness (PGD, FGSM, patch attacks), saliency interpretability, and human alignment on CIFAR-10/C.</div>
+                <div class="item-skills">
+                  <span class="project-skill">PyTorch</span><span class="project-skill">Adversarial ML</span><span class="project-skill">Interpretability</span><span class="project-skill">CIFAR-10</span>
+                </div>
+              </li>
+            </ul>
+          </section>
+
+          <footer id="site-footer">
+            <p class="footer-line">&copy; 2026 Aravind Kannappan · New York, NY · US Citizen</p>
+            <p class="footer-line">
+              <a href="https://github.com/aravinds-kannappan" target="_blank" rel="noopener">GitHub</a> ·
+              <a href="https://www.linkedin.com/in/aravindkannappan" target="_blank" rel="noopener">LinkedIn</a> ·
+              <a href="https://replays-ai.vercel.app/" target="_blank" rel="noopener">Replays AI</a> ·
+              <a href="https://synthure.vercel.app/" target="_blank" rel="noopener">Synthure</a> ·
+              <a href="mailto:ak10150@nyu.edu">ak10150@nyu.edu</a>
+            </p>
+          </footer>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Loss Landscape -->
+    <div id="right">
+      <canvas id="landscape-canvas"></canvas>
+      <div id="landscape-ui">
+        <div id="loss-readout">loss landscape · click to drop optimizer</div>
+        <div id="landscape-controls">
+          <button class="ctrl-btn" id="btn-sgd">SGD</button>
+          <button class="ctrl-btn" id="btn-adam">Adam</button>
+          <button class="ctrl-btn" id="btn-momentum">Momentum</button>
+          <button class="ctrl-btn" id="btn-reset">reset</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ── TERMINAL ── */
+(function () {
+  const KEY = 'ak_intro_v2';
+  const LINES = [
+    { id: 'tl0', text: '>>> import aravind as ak', cls: '' },
+    { id: 'tl1', text: 'loaded. focus=ml_safety, loc=nyc', cls: 't-ok' },
+    { id: 'tl2', text: '>>> ak.research', cls: '' },
+    { id: 'tl3', text: "['alignment', 'bayesian', 'genomics', 'llm']", cls: 't-gray' },
+    { id: 'tl4', text: '>>> ak.bio()', cls: '' },
+    { id: 'tl5', text: '', cls: '' },
+  ];
+  let step = 0, typing = false, revealed = false;
+  const cur = document.createElement('span');
+  cur.className = 'cursor';
+
+  function typeLine(el, text, cls, cb) {
+    if (cls) el.className = 't-line ' + cls;
+    if (cur.parentNode) cur.parentNode.removeChild(cur);
+    el.appendChild(cur);
+    if (!text) { cb && cb(); return; }
+    let i = 0;
+    const iv = setInterval(() => {
+      cur.before(document.createTextNode(text[i++]));
+      if (i >= text.length) { clearInterval(iv); cb && cb(); }
+    }, 22);
+  }
+
+  function runSeq(ri, ni, then) {
+    const r = LINES[ri];
+    typeLine(document.getElementById(r.id), r.text, r.cls, () => {
+      if (ni == null) { then && then(); return; }
+      const n = LINES[ni];
+      typeLine(document.getElementById(n.id), n.text, n.cls, () => { typing = false; then && then(); });
+    });
+  }
+
+  function hideSkip() { const s = document.getElementById('t-skip'); if (s) s.classList.add('hide'); }
+
+  function advance() {
+    if (typing || revealed) return;
+    hideSkip(); typing = true;
+    if (step === 0) { runSeq(1, 2, () => { step = 1; }); }
+    else if (step === 1) { runSeq(3, 4, () => { step = 2; }); }
+    else { typing = false; reveal(); }
+  }
+
+  function reveal() {
+    if (revealed) return;
+    revealed = true;
+    try { sessionStorage.setItem(KEY, '1'); } catch(_) {}
+    if (cur.parentNode) cur.parentNode.removeChild(cur);
+    document.getElementById('terminal-wrap').classList.add('hide');
+    setTimeout(() => {
+      document.getElementById('nav').classList.add('show');
+      document.getElementById('bio-wrap').classList.add('show');
+    }, 280);
+  }
+
+  try { if (sessionStorage.getItem(KEY)) { reveal(); return; } } catch(_) {}
+
+  setTimeout(() => {
+    typing = true;
+    typeLine(document.getElementById('tl0'), LINES[0].text, LINES[0].cls, () => {
+      typing = false;
+      const h = document.getElementById('t-hint');
+      if (h) h.style.opacity = '1';
+    });
+  }, 500);
+
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Enter') { e.preventDefault(); advance(); }
+    if (e.code === 'Space') { e.preventDefault(); }
+  });
+  document.getElementById('left').addEventListener('click', () => { if (!typing) advance(); });
+  const skip = document.getElementById('t-skip');
+  if (skip) skip.addEventListener('click', e => { e.stopPropagation(); if (!revealed) { hideSkip(); reveal(); } });
+})();
+
+/* ── COPY EMAIL ── */
+(function () {
+  const btn = document.getElementById('copy-email-btn');
+  if (btn) btn.addEventListener('click', () => {
+    navigator.clipboard.writeText('ak10150@nyu.edu').then(() => {
+      btn.textContent = 'copied ✓';
+      setTimeout(() => { btn.textContent = 'copy email'; }, 1800);
+    });
+  });
+})();
+
+/* ── NAV SCROLL ── */
+(function () {
+  const wrap = document.getElementById('bio-wrap');
+  document.querySelectorAll('.nav-links a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const el = document.getElementById(a.getAttribute('href').slice(1));
+      if (el && wrap) { e.preventDefault(); wrap.scrollTo({ top: el.offsetTop - 24, behavior: 'smooth' }); }
+    });
+  });
+})();
+
+/* ── LOSS LANDSCAPE ── */
+(function () {
+  const canvas = document.getElementById('landscape-canvas');
+  const ctx = canvas.getContext('2d');
+  const readout = document.getElementById('loss-readout');
+
+  let W, H, imageData, landscapePixels;
+  let optimizerType = 'adam';
+  let particles = [];
+  let trails = [];
+  let animId;
+
+  /* ── Surface: a sum of Gaussians = bumpy loss landscape ── */
+  const WELLS = [
+    { cx: 0.35, cy: 0.42, depth: 1.0, rx: 0.18, ry: 0.14 },
+    { cx: 0.72, cy: 0.65, depth: 0.55, rx: 0.14, ry: 0.12 },
+    { cx: 0.55, cy: 0.22, depth: 0.42, rx: 0.12, ry: 0.10 },
+    { cx: 0.18, cy: 0.70, depth: 0.38, rx: 0.13, ry: 0.11 },
+    { cx: 0.82, cy: 0.28, depth: 0.30, rx: 0.10, ry: 0.09 },
+    { cx: 0.60, cy: 0.80, depth: 0.25, rx: 0.11, ry: 0.08 },
+  ];
+
+  /* Saddle and ridge contributions */
+  const RIDGES = [
+    { cx: 0.5, cy: 0.5, ax: 0.6, ay: -0.4, height: 0.35 },
+    { cx: 0.25, cy: 0.35, ax: 0.3, ay: 0.5, height: 0.2 },
+  ];
+
+  function loss(nx, ny) {
+    /* nx, ny in [0,1] */
+    let val = 0.5; /* base */
+    /* Attractive wells */
+    for (const w of WELLS) {
+      const dx = (nx - w.cx) / w.rx;
+      const dy = (ny - w.cy) / w.ry;
+      val -= w.depth * Math.exp(-0.5 * (dx*dx + dy*dy));
+    }
+    /* Ridges */
+    for (const r of RIDGES) {
+      const dx = nx - r.cx, dy = ny - r.cy;
+      const proj = dx * r.ax + dy * r.ay;
+      const perp = Math.sqrt(Math.max(0, (dx*dx + dy*dy) - proj*proj));
+      val += r.height * Math.exp(-perp * perp * 8) * Math.exp(-proj * proj * 2);
+    }
+    /* Gentle global bowl to keep things in frame */
+    const bx = nx - 0.35, by = ny - 0.42;
+    val += 0.08 * (bx*bx + by*by) * 6;
+    return val;
+  }
+
+  function gradient(nx, ny) {
+    const eps = 0.002;
+    return {
+      gx: (loss(nx + eps, ny) - loss(nx - eps, ny)) / (2 * eps),
+      gy: (loss(nx, ny + eps) - loss(nx, ny - eps)) / (2 * eps),
+    };
+  }
+
+  /* ── Build landscape image ── */
+  function buildLandscape() {
+    const RES = 3; /* sample every N pixels */
+    const cols = Math.ceil(W / RES), rows = Math.ceil(H / RES);
+    landscapePixels = new Float32Array(cols * rows);
+
+    let minL = Infinity, maxL = -Infinity;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const v = loss(c / (cols - 1), r / (rows - 1));
+        landscapePixels[r * cols + c] = v;
+        if (v < minL) minL = v;
+        if (v > maxL) maxL = v;
+      }
+    }
+
+    /* Render to imageData — warm paper palette */
+    imageData = ctx.createImageData(W, H);
+    const d = imageData.data;
+    for (let py = 0; py < H; py++) {
+      for (let px = 0; px < W; px++) {
+        const c = Math.floor(px / RES), r = Math.floor(py / RES);
+        const ci = Math.min(r, rows - 1) * cols + Math.min(c, cols - 1);
+        const t = (landscapePixels[ci] - minL) / (maxL - minL);
+        /* Palette: paper cream (high loss) → warm deep (low loss / minimum) */
+        /* Low t = low loss = minimum = dark warm brown */
+        /* High t = high loss = light cream */
+        const i = (py * W + px) * 4;
+        /* Perceptual gradient: cream → dusty gold → warm brown → deep charcoal */
+        let r8, g8, b8;
+        if (t < 0.3) {
+          /* deep basin: dark warm brown */
+          const s = t / 0.3;
+          r8 = Math.round(40 + s * (110 - 40));
+          g8 = Math.round(25 + s * (75 - 25));
+          b8 = Math.round(18 + s * (45 - 18));
+        } else if (t < 0.6) {
+          const s = (t - 0.3) / 0.3;
+          r8 = Math.round(110 + s * (185 - 110));
+          g8 = Math.round(75 + s * (155 - 75));
+          b8 = Math.round(45 + s * (120 - 45));
+        } else {
+          const s = (t - 0.6) / 0.4;
+          r8 = Math.round(185 + s * (237 - 185));
+          g8 = Math.round(155 + s * (229 - 155));
+          b8 = Math.round(120 + s * (218 - 120));
+        }
+        d[i]   = r8;
+        d[i+1] = g8;
+        d[i+2] = b8;
+        d[i+3] = 255;
+      }
+    }
+
+    /* Contour lines */
+    const LEVELS = 12;
+    for (let py = 1; py < H - 1; py++) {
+      for (let px = 1; px < W - 1; px++) {
+        const c = Math.floor(px / RES), r = Math.floor(py / RES);
+        const ci = Math.min(r, rows - 1) * cols + Math.min(c, cols - 1);
+        const v = landscapePixels[ci];
+        const t = (v - minL) / (maxL - minL);
+        const level = t * LEVELS;
+        const frac = level - Math.floor(level);
+        if (frac < 0.07 || frac > 0.93) {
+          const i = (py * W + px) * 4;
+          /* Subtle contour: blend with slight darkening */
+          d[i]   = Math.round(d[i]   * 0.78);
+          d[i+1] = Math.round(d[i+1] * 0.78);
+          d[i+2] = Math.round(d[i+2] * 0.78);
+        }
+      }
+    }
+  }
+
+  /* ── Optimizer step ── */
+  function optimizerStep(p) {
+    const { gx, gy } = gradient(p.nx, p.ny);
+    const lr = p.lr;
+
+    if (p.type === 'sgd') {
+      p.nx -= lr * gx;
+      p.ny -= lr * gy;
+    } else if (p.type === 'momentum') {
+      p.vx = 0.85 * p.vx - lr * gx;
+      p.vy = 0.85 * p.vy - lr * gy;
+      p.nx += p.vx;
+      p.ny += p.vy;
+    } else if (p.type === 'adam') {
+      p.t = (p.t || 0) + 1;
+      const b1 = 0.9, b2 = 0.999, eps = 1e-8;
+      p.m1x = b1 * (p.m1x || 0) + (1 - b1) * gx;
+      p.m1y = b1 * (p.m1y || 0) + (1 - b1) * gy;
+      p.m2x = b2 * (p.m2x || 0) + (1 - b2) * gx * gx;
+      p.m2y = b2 * (p.m2y || 0) + (1 - b2) * gy * gy;
+      const m1xh = p.m1x / (1 - Math.pow(b1, p.t));
+      const m1yh = p.m1y / (1 - Math.pow(b1, p.t));
+      const m2xh = p.m2x / (1 - Math.pow(b2, p.t));
+      const m2yh = p.m2y / (1 - Math.pow(b2, p.t));
+      p.nx -= lr * m1xh / (Math.sqrt(m2xh) + eps);
+      p.ny -= lr * m1yh / (Math.sqrt(m2yh) + eps);
+    }
+
+    /* Clamp */
+    p.nx = Math.max(0.01, Math.min(0.99, p.nx));
+    p.ny = Math.max(0.01, Math.min(0.99, p.ny));
+    p.loss = loss(p.nx, p.ny);
+
+    /* Record trail */
+    p.trail.push({ nx: p.nx, ny: p.ny });
+    if (p.trail.length > 220) p.trail.shift();
+    p.steps++;
+  }
+
+  /* Optimizer color palette */
+  const OPT_COLORS = {
+    sgd:      { dot: '#e74c3c', trail: 'rgba(231,76,60,' },
+    adam:     { dot: '#2980b9', trail: 'rgba(41,128,185,' },
+    momentum: { dot: '#27ae60', trail: 'rgba(39,174,96,' },
+  };
+
+  /* ── Render ── */
+  function render() {
+    ctx.putImageData(imageData, 0, 0);
+
+    /* Draw trails and particles */
+    for (const p of particles) {
+      const col = OPT_COLORS[p.type];
+      if (p.trail.length > 1) {
+        for (let i = 1; i < p.trail.length; i++) {
+          const alpha = (i / p.trail.length) * 0.75;
+          ctx.beginPath();
+          ctx.strokeStyle = col.trail + alpha + ')';
+          ctx.lineWidth = 1.5;
+          ctx.lineCap = 'round';
+          ctx.moveTo(p.trail[i-1].nx * W, p.trail[i-1].ny * H);
+          ctx.lineTo(p.trail[i].nx * W, p.trail[i].ny * H);
+          ctx.stroke();
+        }
+      }
+      /* Dot */
+      const px = p.nx * W, py = p.ny * H;
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, Math.PI * 2);
+      ctx.fillStyle = col.dot;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      /* Label */
+      ctx.font = '500 10px "DM Mono", monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.fillText(p.type, px + 8, py - 6);
+    }
+  }
+
+  function tick() {
+    for (const p of particles) {
+      if (!p.converged) {
+        optimizerStep(p);
+        const g = gradient(p.nx, p.ny);
+        const gnorm = Math.sqrt(g.gx*g.gx + g.gy*g.gy);
+        if (gnorm < 0.008 || p.steps > 600) p.converged = true;
+      }
+    }
+    render();
+
+    /* Update readout */
+    if (particles.length > 0) {
+      const p = particles[particles.length - 1];
+      readout.textContent = p.type + ' · step ' + p.steps + ' · loss ' + p.loss.toFixed(4);
+    }
+    animId = requestAnimationFrame(tick);
+  }
+
+  function spawnAt(nx, ny) {
+    const type = optimizerType;
+    particles.push({
+      type, nx, ny, loss: loss(nx, ny),
+      vx: 0, vy: 0, trail: [{ nx, ny }],
+      steps: 0, converged: false,
+      lr: type === 'sgd' ? 0.003 : type === 'momentum' ? 0.002 : 0.012,
+    });
+    if (particles.length > 4) particles.shift();
+  }
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = canvas.parentElement.getBoundingClientRect();
+    W = Math.floor(rect.width);
+    H = Math.floor(rect.height);
+    canvas.width = W;
+    canvas.height = H;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    buildLandscape();
+    render();
+  }
+
+  canvas.addEventListener('click', e => {
+    const r = canvas.getBoundingClientRect();
+    const nx = (e.clientX - r.left) / r.width;
+    const ny = (e.clientY - r.top) / r.height;
+    spawnAt(nx, ny);
+  });
+
+  document.getElementById('btn-sgd').addEventListener('click', () => { optimizerType = 'sgd'; });
+  document.getElementById('btn-adam').addEventListener('click', () => { optimizerType = 'adam'; });
+  document.getElementById('btn-momentum').addEventListener('click', () => { optimizerType = 'momentum'; });
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    particles = [];
+    render();
+    readout.textContent = 'loss landscape · click to drop optimizer';
+  });
+
+  window.addEventListener('resize', () => { resize(); });
+  resize();
+  cancelAnimationFrame(animId);
+  animId = requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
