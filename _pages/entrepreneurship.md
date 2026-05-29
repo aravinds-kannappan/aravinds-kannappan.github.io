@@ -1,6 +1,6 @@
 ---
 layout: archive
-title: "Entrepreneurship"
+title: "Founder"
 permalink: /entrepreneurship/
 author_profile: true
 ---
