@@ -25,6 +25,7 @@ I write about ML from first principles on my [blog](/year-archive/). Recent post
 - [Why Models Fail on New Data: Generalization from First Principles](/posts/2025/06/generalization/) — bias-variance tradeoff, regularization, and the double descent phenomenon
 - [Probabilistic Modeling from First Principles](/posts/2025/07/probabilistic-modeling/) — Bayes' theorem through variational inference
 - [Failure Modes in Production ML](/posts/2025/08/failure-modes/) — leakage, distribution shift, and calibration failures with systematic fixes
+- [When RAG Fails: Building a GraphRAG System for Multi-Hop Reasoning](/posts/2026/01/graphrag-multihop/) — knowledge graphs, Personalized PageRank retrieval, and C++ entity linking vs naive cosine-search RAG
 
 ## News
 
