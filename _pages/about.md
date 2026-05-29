@@ -7,37 +7,18 @@ redirect_from:
   - /about.html
 ---
 
-I'm an **AI/ML Engineer** with production experience designing LLM-powered systems, RAG pipelines, and multi-agent orchestration frameworks across healthcare, sports analytics, and AI safety research. I deploy microservices on AWS and GCP with CI/CD automation, HIPAA-aligned security, and ETL pipelines processing large-scale datasets.
-
-Currently pursuing an **MS in Applied Statistics** (ML specialization) at NYU, and serving as a CORDA AI Fellow at the [NYU AI Whistleblower Initiative](https://nyuai.org). I care deeply about building systems that are both performant and safe.
+I build AI systems end to end, from model architecture and training to production infrastructure and APIs. My work spans healthcare (clinical AI at Synthure), sports analytics (Replays AI), and AI safety research (CORDA Fellow at NYU). I'm most at home in fast-moving environments where the gap between prototype and production is short, the problems involve real math, and correctness matters. Currently finishing an MS in Applied Statistics (ML specialization) at NYU.
 
 ## Research Interests
 
-- **AI Safety & Alignment** — RLHF pipeline design, alignment drift evaluation, adversarial robustness, and interpretability
-- **Bayesian Methods** — probabilistic modeling, uncertainty quantification, and calibration
-- **Production ML Systems** — understanding and fixing failure modes (data leakage, distribution shift, miscalibration) before they reach users
+- **AI Safety & Alignment**, RLHF pipeline design, alignment drift evaluation, adversarial robustness, and interpretability
+- **Bayesian Methods**, probabilistic modeling, uncertainty quantification, and calibration
+- **Production ML Systems**, understanding and fixing failure modes (data leakage, distribution shift, miscalibration) before they reach users
 
 ## Technical Writing
 
-I write about ML from first principles on my [blog](/year-archive/). Recent posts:
+Writing forces me to understand things well enough to explain them without hand-waving. I cover optimization geometry, generalization theory, probabilistic modeling, and algorithmic information theory, always from first principles and with real benchmarks. You can find all my posts on my [blog](/year-archive/).
 
-- [Gradient Descent from First Principles: SGD, Momentum, and Adam](/posts/2025/05/optimization-first-principles/) — building intuition from the loss landscape up, with benchmarks
-- [Why Models Fail on New Data: Generalization from First Principles](/posts/2025/06/generalization/) — bias-variance tradeoff, regularization, and the double descent phenomenon
-- [Probabilistic Modeling from First Principles](/posts/2025/07/probabilistic-modeling/) — Bayes' theorem through variational inference
-- [Failure Modes in Production ML](/posts/2025/08/failure-modes/) — leakage, distribution shift, and calibration failures with systematic fixes
-- [When RAG Fails: Building a GraphRAG System for Multi-Hop Reasoning](/posts/2026/01/graphrag-multihop/) — knowledge graphs, Personalized PageRank retrieval, and C++ entity linking vs naive cosine-search RAG
-- [Singular Learning Theory and the Geometry of Neural Network Interpretability](/posts/2026/03/singular-learning-interpretability/) — RLCT, phase transitions, superposition as compressed sensing, and causal abstraction
-- [The Mathematics of Adversarial Robustness: Certified Defenses, Lipschitz Geometry, and Perturbation Sets](/posts/2026/04/adversarial-robustness-geometry/) — randomized smoothing, PAC-Bayes bounds, concentration of measure, and the inevitability of adversarial examples
-- [Kolmogorov Complexity, Solomonoff Induction, and the Philosophical Limits of Aligned AGI](/posts/2026/05/kolmogorov-alignment/) — algorithmic information theory, AIXI, the Löbian obstacle, and the undecidability of value grounding
+## Interests
 
-## News
-
-| Date | Event |
-|------|-------|
-| Apr 2026 | Started as CORDA AI Fellow — NYU AI Whistleblower Initiative |
-| Feb 2026 | Joined Supervised Program for Alignment Research (SPAR) |
-| 2026 | Book chapter published: *Agentic AI Systems for Clinical Reasoning* |
-| Sep 2025 | Joined Replays AI as Software Engineer, AI/ML |
-| 2024 | Paper published in *The Oncologist*: Multiple Myeloma Gene Signatures |
-| Aug 2024 | Started MS in Applied Statistics at NYU |
-| Jul 2023 | Founded Synthure \| Care Clarity AI |
+Outside of building things, I'm a competitive chess player (BU Chess Club alum) and a loyal fan of the [Golden State Warriors](https://www.nba.com/warriors) and [San Francisco 49ers](https://www.49ers.com). When I'm not watching film I'm grinding [chess tactics on Lichess](https://lichess.org/training).
