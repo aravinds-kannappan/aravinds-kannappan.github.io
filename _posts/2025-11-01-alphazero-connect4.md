@@ -2,6 +2,7 @@
 title: "Implementing AlphaZero for Connect Four: MCTS + Neural Policy in C++ and Python"
 date: 2025-11-01
 permalink: /posts/2025/11/alphazero-connect4/
+render_with_liquid: false
 tags:
   - reinforcement learning
   - MCTS

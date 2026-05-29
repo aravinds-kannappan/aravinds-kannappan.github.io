@@ -2,6 +2,7 @@
 title: "When RAG Fails: Building a GraphRAG System for Multi-Hop Reasoning"
 date: 2026-01-01
 permalink: /posts/2026/01/graphrag-multihop/
+render_with_liquid: false
 tags:
   - rag
   - knowledge-graphs
