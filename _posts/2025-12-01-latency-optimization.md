@@ -8,7 +8,7 @@ tags:
   - software engineering
 ---
 
-A model serving endpoint at Synthure had a p99 latency of 4.2 seconds. Physicians were waiting that long — four seconds — for coding recommendations during patient encounters. The product team had assumed LLM inference was the problem. We had discussed switching to a smaller model, accepting worse accuracy in exchange for speed. Before doing that, we profiled.
+A model serving endpoint at Synthure had a p99 latency of 4.2 seconds. Physicians were waiting that long, four seconds, for coding recommendations during patient encounters. The product team had assumed LLM inference was the problem. We had discussed switching to a smaller model, accepting worse accuracy in exchange for speed. Before doing that, we profiled.
 
 The tokenizer was eating a third of the budget. No one had suspected the tokenizer.
 
@@ -38,7 +38,7 @@ What came out:
 | Postprocess | 15 | 28 | 35 | 1% |
 | **Total** | **2665** | **3538** | **4255** | **100%** |
 
-Three surprises: tokenization was the single largest bottleneck at 33% of p99. The retrieval steps (embed + search + rerank) together took 41%, all running sequentially. LLM inference, which we had assumed was dominant, was only 26% — significant, but third.
+Three surprises: tokenization was the single largest bottleneck at 33% of p99. The retrieval steps (embed + search + rerank) together took 41%, all running sequentially. LLM inference, which we had assumed was dominant, was only 26%, significant, but third.
 
 The order of interventions changed completely.
 
@@ -46,7 +46,7 @@ The order of interventions changed completely.
 
 ## Fix 1: Rewrite Tokenization in C++
 
-The tokenizer was a pure Python BPE implementation — 1,400ms for medical text because it was doing O(n²) byte-pair merges in Python interpreter loops. Medical notes average 800–1,200 tokens; at that length, the quadratic cost is visible.
+The tokenizer was a pure Python BPE implementation, 1,400ms for medical text because it was doing O(n²) byte-pair merges in Python interpreter loops. Medical notes average 800–1,200 tokens; at that length, the quadratic cost is visible.
 
 The fix was a C++ implementation via pybind11. The core merge loop:
 
@@ -68,13 +68,13 @@ while (changed) {
 
 The C++ version processes the same merge table with native hash map lookups and no interpreter overhead. For a vocabulary of 50k merges applied to an 800-token input, the Python loop runs 50k × 800 = 40M dict lookups in Python bytecode. The C++ version runs the same lookups in ~2ns each versus ~100ns in Python.
 
-Result: tokenization dropped from 1,400ms p99 to 85ms p99 — **16x speedup**. Total p99 went from 4,255ms to 2,940ms.
+Result: tokenization dropped from 1,400ms p99 to 85ms p99, **16x speedup**. Total p99 went from 4,255ms to 2,940ms.
 
 ---
 
 ## Fix 2: Parallelize the Retrieval Pipeline
 
-The embed → vector search → rerank sequence was running sequentially, even though the query embedding could start immediately and doesn't need to wait for anything. More importantly, we were running separate dense and sparse retrieval pipelines in series — dense first, then sparse — and fusing results at the end.
+The embed → vector search → rerank sequence was running sequentially, even though the query embedding could start immediately and doesn't need to wait for anything. More importantly, we were running separate dense and sparse retrieval pipelines in series, dense first, then sparse, and fusing results at the end.
 
 Dense and sparse retrieval are completely independent. Running them concurrently costs nothing:
 
@@ -95,7 +95,7 @@ Total p99 after fixes 1 and 2: from 2,940ms to 1,615ms.
 
 ## Fix 3: Dynamic Batching at the API Layer
 
-Each request was triggering a separate GPU forward pass. For a 7B parameter model on a single A10G, the memory transfer and CUDA kernel launch overhead is roughly 200ms — paid once per request regardless of batch size (up to the memory limit). Batching 8 requests costs the same as batching 1 in kernel launch time; the per-token compute is nearly identical up to batch size ~16.
+Each request was triggering a separate GPU forward pass. For a 7B parameter model on a single A10G, the memory transfer and CUDA kernel launch overhead is roughly 200ms, paid once per request regardless of batch size (up to the memory limit). Batching 8 requests costs the same as batching 1 in kernel launch time; the per-token compute is nearly identical up to batch size ~16.
 
 The TypeScript API layer collects requests for up to 50ms and flushes them together:
 
@@ -120,7 +120,7 @@ class RequestBatcher {
 }
 ```
 
-The 50ms wait adds latency to individual requests that arrive in isolation, but at production throughput (30–80 requests/second), the queue fills before the timer fires. The effective LLM inference latency dropped from 1,100ms to 680ms — not 16x, because batching helps less when the bottleneck is per-batch overhead, not per-token compute.
+The 50ms wait adds latency to individual requests that arrive in isolation, but at production throughput (30–80 requests/second), the queue fills before the timer fires. The effective LLM inference latency dropped from 1,100ms to 680ms, not 16x, because batching helps less when the bottleneck is per-batch overhead, not per-token compute.
 
 ---
 
@@ -142,7 +142,7 @@ existing = shared_memory.SharedMemory(name=shm.name)
 tensor_in = np.ndarray((batch_size, seq_len), dtype=np.int32, buffer=existing.buf)
 ```
 
-The tensor data now lives in one memory region accessible from both processes. No serialization, no copy. This saved 35–55ms per request — smaller than the tokenizer win, but free.
+The tensor data now lives in one memory region accessible from both processes. No serialization, no copy. This saved 35–55ms per request, smaller than the tokenizer win, but free.
 
 ---
 
@@ -158,6 +158,6 @@ The tensor data now lives in one memory region accessible from both processes. N
 
 We got to 380ms p99 without changing the model. No accuracy tradeoff. The smaller-model conversation never happened.
 
-The lesson generalizes: latency problems rarely live where you assume they do. The GPU is expensive, so we assume it dominates. The LLM is the "AI part," so we assume it's the bottleneck. But production systems are end-to-end pipelines, and the bottleneck is wherever the slowest non-parallel stage sits. The tokenizer — a piece of software that predates neural networks entirely — was what physicians were waiting on.
+The lesson generalizes: latency problems rarely live where you assume they do. The GPU is expensive, so we assume it dominates. The LLM is the "AI part," so we assume it's the bottleneck. But production systems are end-to-end pipelines, and the bottleneck is wherever the slowest non-parallel stage sits. The tokenizer, a piece of software that predates neural networks entirely, was what physicians were waiting on.
 
 Measure first. Then fix what you measured.

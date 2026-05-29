@@ -10,21 +10,21 @@ tags:
 
 During my first serious training run at Synthure, I watched a model converge beautifully for 40 epochs, then diverge. Learning rate too high, I assumed. I halved it. It diverged again, faster. I halved it again. Now it converged but plateaued far above the target loss. After two days I realized what was actually wrong: I was using SGD with momentum on a loss landscape with wildly different curvatures along different parameter directions, and no single learning rate could handle both the shallow ravines and the steep walls simultaneously.
 
-That experience sent me back to first principles. This post traces the development from SGD to Adam to Muon — not as a list of formulas but as a sequence of problems and their solutions, each optimizer emerging naturally from what the previous one couldn't handle.
+That experience sent me back to first principles. This post traces the development from SGD to Adam to Muon, not as a list of formulas but as a sequence of problems and their solutions, each optimizer emerging naturally from what the previous one couldn't handle.
 
 ---
 
 ## The Curvature Problem
 
-Consider a quadratic loss $L(\theta) = \frac{1}{2}\theta^T A\theta$ where $A$ is positive definite with eigenvalues $\lambda_1 \leq \cdots \leq \lambda_d$. Gradient descent updates $(I - \eta A)\theta_t$, and convergence requires $\eta < 2/\lambda_d$. The convergence rate along the $i$-th eigendirection is $|1 - \eta\lambda_i|^t$ — fast along steep directions, glacially slow along shallow ones.
+Consider a quadratic loss $L(\theta) = \frac{1}{2}\theta^T A\theta$ where $A$ is positive definite with eigenvalues $\lambda_1 \leq \cdots \leq \lambda_d$. Gradient descent updates $(I - \eta A)\theta_t$, and convergence requires $\eta < 2/\lambda_d$. The convergence rate along the $i$-th eigendirection is $|1 - \eta\lambda_i|^t$, fast along steep directions, glacially slow along shallow ones.
 
-The condition number $\kappa = \lambda_d/\lambda_1$ is the core problem. To stay stable along the steepest direction we must use $\eta \approx 1/\lambda_d$; convergence along the shallowest then requires $O(\kappa)$ steps. For real neural networks $\kappa > 10^6$. No single learning rate fixes this — it is a fundamental geometric mismatch between the Euclidean update and the curved landscape.
+The condition number $\kappa = \lambda_d/\lambda_1$ is the core problem. To stay stable along the steepest direction we must use $\eta \approx 1/\lambda_d$; convergence along the shallowest then requires $O(\kappa)$ steps. For real neural networks $\kappa > 10^6$. No single learning rate fixes this, it is a fundamental geometric mismatch between the Euclidean update and the curved landscape.
 
 ---
 
 ## Momentum: Memory Along Consistent Directions
 
-**Momentum** accumulates a velocity $v_t = \beta v_{t-1} + (1-\beta)g_t$ and steps along $v_t$ rather than $g_t$. Along consistent gradient directions (shallow ravines), velocity builds; across inconsistent ones (steep walls), it damps. The effective step size along low-curvature directions scales as $1/(1-\beta)$ — a $10\times$ boost for $\beta = 0.9$.
+**Momentum** accumulates a velocity $v_t = \beta v_{t-1} + (1-\beta)g_t$ and steps along $v_t$ rather than $g_t$. Along consistent gradient directions (shallow ravines), velocity builds; across inconsistent ones (steep walls), it damps. The effective step size along low-curvature directions scales as $1/(1-\beta)$, a $10\times$ boost for $\beta = 0.9$.
 
 On Rosenbrock's function: SGD takes approximately 10,000 iterations to reach the minimum; momentum takes approximately 1,200. The geometry this exploits is simple: ravines are traversed faster when you carry speed into them.
 
@@ -32,9 +32,9 @@ On Rosenbrock's function: SGD takes approximately 10,000 iterations to reach the
 
 ## RMSProp: Per-Parameter Curvature Adaptation
 
-Momentum doesn't fix the condition number problem — it only exploits directional consistency. **RMSProp** attacks the condition number directly by maintaining a per-parameter estimate of recent gradient scale $v_t = \beta v_{t-1} + (1-\beta)g_t^2$ and dividing each step by $\sqrt{v_t} + \varepsilon$. Parameters in steep directions accumulate large $v$ and get small steps; parameters in flat directions keep small $v$ and get large steps. The effective condition number of the update approaches 1 regardless of the raw curvature.
+Momentum doesn't fix the condition number problem, it only exploits directional consistency. **RMSProp** attacks the condition number directly by maintaining a per-parameter estimate of recent gradient scale $v_t = \beta v_{t-1} + (1-\beta)g_t^2$ and dividing each step by $\sqrt{v_t} + \varepsilon$. Parameters in steep directions accumulate large $v$ and get small steps; parameters in flat directions keep small $v$ and get large steps. The effective condition number of the update approaches 1 regardless of the raw curvature.
 
-On the Beale test function: SGD needs ~12,000 iterations, RMSProp needs ~800. The advantage is not speed in one direction — it's the ability to simultaneously handle all directions correctly.
+On the Beale test function: SGD needs ~12,000 iterations, RMSProp needs ~800. The advantage is not speed in one direction, it's the ability to simultaneously handle all directions correctly.
 
 ---
 
@@ -61,7 +61,7 @@ Benchmark on a 6-layer transformer, 10,000 training steps, identical seeds:
 | RMSProp | 28.4 | 3,100 |
 | Adam | 19.7 | 1,400 |
 
-The improvement at each step is real and consistent. Adam is not magic — it is the conjunction of two geometric corrections that individually matter and together matter more.
+The improvement at each step is real and consistent. Adam is not magic, it is the conjunction of two geometric corrections that individually matter and together matter more.
 
 ---
 
@@ -78,12 +78,12 @@ for _ in range(5):              # converges in 5 steps
 theta -= lr * X
 ```
 
-The orthogonalized update applies the same effective learning rate to all singular directions of the gradient — the matrix analog of Adam's per-element normalization. On a 124M-parameter transformer: Adam reaches perplexity 19.7, Muon reaches 17.3, using the same memory and only marginally more compute. The gap grows with model scale as larger transformer weight matrices have more singular structure to exploit.
+The orthogonalized update applies the same effective learning rate to all singular directions of the gradient, the matrix analog of Adam's per-element normalization. On a 124M-parameter transformer: Adam reaches perplexity 19.7, Muon reaches 17.3, using the same memory and only marginally more compute. The gap grows with model scale as larger transformer weight matrices have more singular structure to exploit.
 
 ---
 
 ## The Landscape as the Theory
 
-Each optimizer improvement corresponds to a different geometric insight: ill-conditioning (RMSProp), directional consistency (momentum), matrix manifold structure (Muon). The sequence is not arbitrary — it is a systematic accounting of the geometric pathologies of neural network loss landscapes.
+Each optimizer improvement corresponds to a different geometric insight: ill-conditioning (RMSProp), directional consistency (momentum), matrix manifold structure (Muon). The sequence is not arbitrary, it is a systematic accounting of the geometric pathologies of neural network loss landscapes.
 
-What strikes me about this progression is how each method required first understanding *why* the previous one failed, not just observing that it did. SGD fails on ill-conditioned landscapes because Euclidean steps misrepresent curvature. Adam fails on matrix parameters because element-wise adaptation misrepresents the parameter manifold. Understanding the geometry of the loss landscape is not background theory — it is the direct path to building better optimizers.
+What strikes me about this progression is how each method required first understanding *why* the previous one failed, not just observing that it did. SGD fails on ill-conditioned landscapes because Euclidean steps misrepresent curvature. Adam fails on matrix parameters because element-wise adaptation misrepresents the parameter manifold. Understanding the geometry of the loss landscape is not background theory, it is the direct path to building better optimizers.
