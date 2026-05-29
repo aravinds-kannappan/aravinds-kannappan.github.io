@@ -721,7 +721,7 @@ public:
         // Exact match first
         auto it = exact_index_.find(lower);
         if (it != exact_index_.end()) {
-            return {{it->second, it->first, 1.0f}};
+            return { {it->second, it->first, 1.0f}};
         }
 
         // Fuzzy match via bounded Levenshtein

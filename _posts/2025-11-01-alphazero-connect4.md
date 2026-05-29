@@ -82,7 +82,7 @@ struct GameState {
         int player = -current_player;  // just placed
         auto in_bounds = [](int r, int c) { return r>=0 && r<ROWS && c>=0 && c<COLS; };
         
-        const int dirs[4][2] = {{0,1},{1,0},{1,1},{1,-1}};
+        const int dirs[4][2] = { {0,1},{1,0},{1,1},{1,-1}};
         for (auto [dr, dc] : dirs) {
             int count = 1;
             for (int d : {-1, 1}) {
