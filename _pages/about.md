@@ -26,6 +26,9 @@ I write about ML from first principles on my [blog](/year-archive/). Recent post
 - [Probabilistic Modeling from First Principles](/posts/2025/07/probabilistic-modeling/) — Bayes' theorem through variational inference
 - [Failure Modes in Production ML](/posts/2025/08/failure-modes/) — leakage, distribution shift, and calibration failures with systematic fixes
 - [When RAG Fails: Building a GraphRAG System for Multi-Hop Reasoning](/posts/2026/01/graphrag-multihop/) — knowledge graphs, Personalized PageRank retrieval, and C++ entity linking vs naive cosine-search RAG
+- [The Itô Lens: Stochastic Calculus and the Mathematics of Alignment Drift](/posts/2026/03/stochastic-calculus-alignment/) — SDEs, Fokker-Planck, Girsanov's theorem, and large deviations as a framework for AI safety
+- [The Geometry of Value: Riemannian Manifolds, Geodesics, and Why Objectives Diverge](/posts/2026/04/riemannian-value-alignment/) — Fisher information geometry, holonomy, Goodhart's law as a theorem about the second fundamental form
+- [Kolmogorov Complexity, Solomonoff Induction, and the Philosophical Limits of Aligned AGI](/posts/2026/05/kolmogorov-alignment/) — algorithmic information theory, AIXI, the Löbian obstacle, and the undecidability of value grounding
 
 ## News
 

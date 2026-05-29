@@ -7,7 +7,7 @@ author_profile: true
 
 {% include base_path %}
 
-Building companies taught me things that no course or research role could — about tradeoffs under uncertainty, the cost of technical debt at the worst possible time, and what it actually means to own a system end-to-end. The two ventures below shaped how I think about ML engineering as much as any paper or theorem.
+Building startups taught me things that no course or research role could — about tradeoffs under uncertainty, the cost of technical debt at the worst possible time, and what it actually means to own a system end-to-end. The two ventures below shaped how I think about ML engineering as much as any paper or theorem.
 
 ---
 
