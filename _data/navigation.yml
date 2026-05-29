@@ -5,8 +5,11 @@ main:
   - title: "Portfolio"
     url: /portfolio/
 
+  - title: "Entrepreneurship"
+    url: /entrepreneurship/
+
   - title: "Blog"
     url: /year-archive/
 
   - title: "CV"
-    url: /cv/
+    url: /files/cv.pdf
