@@ -7,18 +7,6 @@ redirect_from:
   - /about.html
 ---
 
-AI/ML Engineer with production experience building LLM-powered systems, RAG pipelines, and multi-agent frameworks across healthcare, sports analytics, and AI safety research. Currently finishing an MS in Applied Statistics (ML specialization) at NYU.
+AI/ML engineer focused on building systems that people can actually trust. My work spans healthcare AI (Synthure), sports analytics (Replays AI), and AI safety research (CORDA Fellow at NYU), and the common thread across all of it is using engineering and cloud infrastructure to solve problems that have real consequences. I care about the gap between a model that looks good on a benchmark and one that behaves correctly in the real world, and I spend a lot of time in that gap. My research interests sit at the intersection of AI safety, Bayesian methods, and production ML, with a focus on alignment drift, adversarial robustness, and catching failure modes before they reach users.
 
-## Research Interests
-
-- **AI Safety & Alignment**, RLHF pipeline design, alignment drift evaluation, adversarial robustness, and interpretability
-- **Bayesian Methods**, probabilistic modeling, uncertainty quantification, and calibration
-- **Production ML Systems**, understanding and fixing failure modes (data leakage, distribution shift, miscalibration) before they reach users
-
-## Technical Writing
-
-Writing forces me to understand things well enough to explain them without hand-waving. I cover optimization geometry, generalization theory, probabilistic modeling, and algorithmic information theory, always from first principles and with real benchmarks. You can find all my posts on my [blog](/year-archive/).
-
-## Interests
-
-Outside of building things, I'm a competitive chess player and a loyal fan of the [Golden State Warriors](https://www.nba.com/warriors) and [San Francisco 49ers](https://www.49ers.com). When I'm not watching film I'm grinding [chess tactics on Lichess](https://lichess.org/training).
+Outside of building things, I write about ML from first principles on my [blog](/year-archive/), covering optimization geometry, generalization theory, and probabilistic modeling with real benchmarks. I am also a competitive chess player and a devoted fan of the [Golden State Warriors](https://www.nba.com/warriors) and [San Francisco 49ers](https://www.49ers.com). When I am not building things I am grinding [tactics on Lichess](https://lichess.org/training) or watching game film.
