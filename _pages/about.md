@@ -21,4 +21,4 @@ Writing forces me to understand things well enough to explain them without hand-
 
 ## Interests
 
-Outside of building things, I'm a competitive chess player (BU Chess Club alum) and a loyal fan of the [Golden State Warriors](https://www.nba.com/warriors) and [San Francisco 49ers](https://www.49ers.com). When I'm not watching film I'm grinding [chess tactics on Lichess](https://lichess.org/training).
+Outside of building things, I'm a competitive chess player and a loyal fan of the [Golden State Warriors](https://www.nba.com/warriors) and [San Francisco 49ers](https://www.49ers.com). When I'm not watching film I'm grinding [chess tactics on Lichess](https://lichess.org/training).
