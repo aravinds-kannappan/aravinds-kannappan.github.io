@@ -7,7 +7,7 @@ redirect_from:
   - /about.html
 ---
 
-I build AI systems end to end, from model architecture and training to production infrastructure and APIs. My work spans healthcare (clinical AI at Synthure), sports analytics (Replays AI), and AI safety research (CORDA Fellow at NYU). I'm most at home in fast-moving environments where the gap between prototype and production is short, the problems involve real math, and correctness matters. Currently finishing an MS in Applied Statistics (ML specialization) at NYU.
+AI/ML Engineer with production experience building LLM-powered systems, RAG pipelines, and multi-agent frameworks across healthcare, sports analytics, and AI safety research. I deploy end-to-end on AWS and GCP, care about correctness, and move fast. Currently finishing an MS in Applied Statistics (ML specialization) at NYU.
 
 ## Research Interests
 
