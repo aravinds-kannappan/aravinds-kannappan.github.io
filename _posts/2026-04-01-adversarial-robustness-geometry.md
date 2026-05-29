@@ -9,206 +9,123 @@ tags:
   - AI safety
 ---
 
-The existence of adversarial examples — inputs imperceptibly different from natural data that cause dramatic mispredictions — is one of the most empirically robust and theoretically puzzling facts in deep learning. Since Szegedy et al. first demonstrated them in 2013, thousands of attack and defense papers have been published, and the central problem remains open: why do adversarial examples exist, and how can we certifiably eliminate them? This post develops the mathematical foundations of adversarial robustness from first principles — through the geometry of perturbation sets, the theory of certified defenses, Lipschitz constraints, and PAC-Bayesian robustness bounds — and argues that the phenomenon of adversarial vulnerability is not an engineering failure but a consequence of the geometry of high-dimensional spaces that admits only partial remedies.
+In 2013 Szegedy et al. showed that a GoogLeNet classifier, trained to near-human accuracy on ImageNet, could be fooled by adding imperceptibly small perturbations to any input image. The perturbations were invisible to human eyes — no larger than the noise in a compressed JPEG — but they caused confident, catastrophically wrong predictions. The model saw a school bus and called it an ostrich. A decade later, after thousands of papers on attacks and defenses, the phenomenon is still not fully understood. State-of-the-art models remain vulnerable in ways that defy intuitive explanation.
+
+The reason adversarial examples are hard to explain is that they are not, primarily, an engineering failure. They are a mathematical consequence of high-dimensional geometry, and understanding them requires moving from empirical observations about specific models to theorems about the geometry of decision boundaries and the measure-theoretic structure of high-dimensional probability spaces.
 
 ---
 
-## Formalizing Robustness
+## What We Are Trying to Prove
 
-Let $$f: \mathcal{X} \to \mathcal{Y}$$ be a classifier mapping inputs $$x \in \mathcal{X} \subseteq \mathbb{R}^d$$ to labels $$y \in \mathcal{Y}$$. Define the **threat model** as a perturbation set $$\mathcal{B}(x, \epsilon) \subseteq \mathcal{X}$$ — the set of inputs considered indistinguishable from $$x$$ by an adversary with budget $$\epsilon$$. The most common choices are $$\ell_p$$ balls:
+The goal of a certified defense is to produce a classifier $f$ together with a guarantee: for every test point $x$ in some distribution, and every perturbation $\delta$ with $\lVert\delta\rVert \leq \epsilon$, the classifier makes the same prediction on $x + \delta$ as on $x$. The guarantee is not probabilistic — it is a proof that holds for all perturbations in the threat model simultaneously.
 
-$$\mathcal{B}_p(x, \epsilon) = \{x' \in \mathcal{X} : \|x' - x\|_p \leq \epsilon\}$$
+Define the **robust accuracy** at radius $\epsilon$ as:
 
-A classifier $$f$$ is **$$(\epsilon, p)$$-robust** at $$x$$ if:
+$$\text{RA}(\epsilon) = P_{(x,y) \sim \mathcal{D}}\!\left(\min_{\lVert\delta\rVert \leq \epsilon} f(x + \delta) = y\right)$$
 
-$$f(x') = f(x) \quad \forall x' \in \mathcal{B}_p(x, \epsilon)$$
-
-The **robust accuracy** at level $$\epsilon$$ is:
-
-$$\text{RA}(\epsilon) = P_{(x,y) \sim \mathcal{D}}\left(\min_{x' \in \mathcal{B}(x,\epsilon)} f(x') = y\right)$$
-
-the probability that the classifier is correct on the worst-case perturbation of each test point. This is the quantity that certified defenses seek to bound from below.
-
-The **adversarial risk** is:
-
-$$R_{\text{adv}}(f) = \mathbb{E}_{(x,y)}\left[\max_{x' \in \mathcal{B}(x,\epsilon)} \mathbf{1}[f(x') \neq y]\right]$$
-
-and the **robustness gap** is $$R_{\text{adv}}(f) - R(f)$$, the difference between adversarial risk and standard risk. Most current classifiers have large robustness gaps — they have near-zero standard error but high adversarial error.
+For most models trained with standard cross-entropy loss, $\text{RA}(\epsilon) \approx 0$ for $\ell_\infty$ perturbations with $\epsilon = 8/255 \approx 0.03$ on ImageNet. The **robustness gap** $\text{RA}(0) - \text{RA}(\epsilon)$ is large, and understanding its size — and whether it can be closed — requires understanding the geometry of the decision boundary.
 
 ---
 
-## The Geometry of Adversarial Examples in High Dimensions
+## Why Perturbations Are So Small: The Linear Hypothesis
 
-A fundamental question: why are adversarial perturbations so small? An $$\ell_\infty$$ perturbation of magnitude $$\epsilon = 8/255 \approx 0.031$$ (the standard ImageNet threat model) is invisible to humans but sufficient to fool state-of-the-art models with near-100% success rate.
+The first explanation for adversarial vulnerability is simple and important. For a linear classifier $f(x) = \text{sign}(w \cdot x + b)$, the $\ell_\infty$ distance from $x$ to the decision boundary is
 
-The answer is geometric. Consider a linear classifier $$f(x) = \text{sign}(w \cdot x + b)$$ in $$\mathbb{R}^d$$. The distance from a correctly classified point $$x$$ to the decision boundary is:
+$$\epsilon^* = \frac{\lvert w \cdot x + b \rvert}{\lVert w \rVert_1}$$
 
-$$\text{dist}(x, \partial f) = \frac{|w \cdot x + b|}{\|w\|_2}$$
+In $d$ dimensions with $d = 10^6$ (ImageNet), the $\ell_1$ norm $\lVert w \rVert_1$ can be enormous even when $\lVert w \rVert_2$ is moderate, because $\lVert w \rVert_1 \leq \sqrt{d} \lVert w \rVert_2$. Perturbing each coordinate by $\epsilon$ in the direction of $\text{sign}(w_i)$ changes the dot product by $\epsilon \lVert w \rVert_1$, which grows as $O(\epsilon \sqrt{d})$ for a unit-norm weight vector. In $d = 10^6$, a perturbation of magnitude $\epsilon = 0.03$ in every coordinate changes the dot product by roughly $0.03 \times 1000 = 30$ — far larger than the margin $\lvert w \cdot x + b \rvert$ for most inputs.
 
-For an $$\ell_\infty$$ adversary, the required perturbation is:
-
-$$\epsilon^* = \frac{|w \cdot x + b|}{\|w\|_\infty}$$
-
-Since $$\|w\|_\infty \leq \|w\|_2 \leq \sqrt{d} \|w\|_\infty$$, we have:
-
-$$\frac{|w \cdot x + b|}{\sqrt{d}\|w\|_\infty} \leq \epsilon^* \leq \frac{|w \cdot x + b|}{\|w\|_\infty}$$
-
-For $$d = 10^6$$ (ImageNet dimensions), $$\epsilon^*$$ in the $$\ell_\infty$$ norm can be $$\sqrt{d} \approx 10^3$$ times smaller than the $$\ell_2$$ distance to the boundary. The model is vulnerable in $$\ell_\infty$$ because it relies on the cumulative effect of many small features — the dot product $$w \cdot x$$ aggregates contributions from all $$d$$ dimensions, and each dimension can be perturbed slightly while the sum changes substantially.
-
-More precisely, Goodfellow et al.'s **linear hypothesis** states that adversarial examples in high dimensions are inevitable for any classifier that uses linear features: perturbing each input coordinate by $$\epsilon$$ in the direction of $$\text{sign}(w_i)$$ changes the output by $$\epsilon \|w\|_1 \geq \epsilon \sqrt{d} \|w\|_2 / \sqrt{d}$$ — growing as $$O(\epsilon d)$$ for classifiers that use all dimensions. This is unavoidable unless the classifier uses only a small number of features (sparse $$w$$) or actively ignores the remaining dimensions.
+The linear classifier is fragile not despite being a good classifier, but *because* it is a good classifier that uses all available dimensions. Good linear classification requires that many small features combine into a decisive prediction, and adversarial attacks exploit exactly those many small features. The same model properties that make a classifier accurate make it adversarially fragile, and this is not a coincidence. It is the linear hypothesis, and it applies to neural networks approximately, because deep networks in their bottom layers perform operations that are approximately linear in the input.
 
 ---
 
-## Randomized Smoothing and Certified $$\ell_2$$ Defenses
+## Randomized Smoothing: The Certified Defense
 
-**Randomized smoothing** (Cohen, Rosenfeld, Kolter, 2019) is the only method that provides scalable certified $$\ell_2$$ defenses for deep networks. The construction is elegant.
+The most practically scalable certified defense is **randomized smoothing**. The idea is elegant: rather than trying to make a given classifier $f$ robust, build a *new* classifier $g$ by averaging $f$ over random noise:
 
-Given any base classifier $$f: \mathbb{R}^d \to \mathcal{Y}$$ (potentially non-robust), define the **smoothed classifier**:
+$$g(x) = \arg\max_{c} \; P\!\left(f(x + \delta) = c\right), \quad \delta \sim \mathcal{N}(0, \sigma^2 I)$$
 
-$$g(x) = \arg\max_{c \in \mathcal{Y}} P(f(x + \delta) = c) \quad \text{where} \quad \delta \sim \mathcal{N}(0, \sigma^2 I)$$
+The smoothed classifier $g$ predicts whichever class $f$ outputs most often when the input is perturbed by Gaussian noise. This sounds like it would reduce accuracy, and it does — but the noise also creates a certificate.
 
-The smoothed classifier predicts the most probable class when the input is corrupted by isotropic Gaussian noise of standard deviation $$\sigma$$.
+The certificate comes from the following argument. Let $c_A$ be the most probable class under $g$ at input $x$, with probability $p_A = P(f(x+\delta) = c_A)$, and let $p_B = \max_{c \neq c_A} P(f(x+\delta) = c)$. **Cohen et al. (2019)** proved that $g$ is certifiably robust within $\ell_2$ radius
 
-**Theorem (Cohen et al.):** If $$g(x) = c_A$$ (the most probable class) with probability $$p_A = P(f(x+\delta)=c_A)$$, and the second-most probable class has probability $$p_B = \max_{c \neq c_A} P(f(x+\delta)=c)$$, then $$g$$ is certifiably robust within:
+$$R = \frac{\sigma}{2}\!\left(\Phi^{-1}(p_A) - \Phi^{-1}(p_B)\right)$$
 
-$$R = \frac{\sigma}{2}\left(\Phi^{-1}(p_A) - \Phi^{-1}(p_B)\right)$$
+where $\Phi^{-1}$ is the inverse normal CDF. The proof uses the Neyman-Pearson lemma: among all sets of measure $p_A$ under $\mathcal{N}(x, \sigma^2 I)$, the one that is hardest to shift to the second class under a translation $\delta$ with $\lVert\delta\rVert_2 \leq R$ is a half-space, and the certificate is the radius at which this half-space's probability falls below $p_B$.
 
-where $$\Phi^{-1}$$ is the inverse standard normal CDF. For $$x' \in \mathcal{B}_2(x, R)$$, $$g(x') = g(x) = c_A$$.
+The table below shows the tradeoff between noise level $\sigma$, clean accuracy, and certified accuracy at radius $R = 0.5$ on CIFAR-10, from Cohen et al.'s original experiments:
 
-*Proof sketch:* For any $$x'$$ with $$\|x'-x\|_2 \leq R$$, the noise-corrupted distributions $$x + \delta$$ and $$x' + \delta$$ (both Gaussian) satisfy:
+| $\sigma$ | Clean accuracy | Certified acc. ($R = 0.5$) |
+|---------|---------------|---------------------------|
+| 0.12    | 77%           | 0%                        |
+| 0.25    | 74%           | 49%                       |
+| 0.50    | 67%           | 38%                       |
+| 1.00    | 57%           | 22%                       |
 
-$$D_{\text{KL}}(\mathcal{N}(x, \sigma^2 I) \| \mathcal{N}(x', \sigma^2 I)) = \frac{\|x-x'\|_2^2}{2\sigma^2} \leq \frac{R^2}{2\sigma^2}$$
-
-By the **Neyman-Pearson lemma**, the optimal adversarial perturbation is in the direction maximizing the log-likelihood ratio, and the robustness radius is determined by how much the probability assigned to $$c_A$$ can decrease under the KL-bounded shift. The Gaussian tail bound converts the KL constraint into the $$\Phi^{-1}$$-based expression.
-
-The certified radius grows with $$\sigma$$ (more noise → larger certificate) but the base accuracy decreases (more noise → harder classification). The accuracy-robustness tradeoff is:
-
-$$\text{Certified accuracy at radius } R = P\left(p_A \geq \Phi\left(\Phi^{-1}(\bar{p}_A) + \frac{R}{\sigma}\right)\right)$$
-
-where $$\bar{p}_A$$ is the Monte Carlo estimate of $$p_A$$. Optimal $$\sigma$$ balances these competing effects and scales as $$\sigma^* \propto R$$.
-
-A crucial limitation: the certificate is in $$\ell_2$$. For $$\ell_\infty$$ threat models (which are often more practically relevant), the Gaussian kernel is suboptimal — it certificates $$\ell_\infty$$ robustness only within radius $$R_\infty = R_2 / \sqrt{d}$$, which shrinks with dimension. **No scalable certification method for $$\ell_\infty$$ robustness with certificates comparable to empirical robustness currently exists.** This is an open problem.
+The tradeoff is fundamental, not incidental: more noise creates larger certificates but worse clean predictions. The optimal $\sigma$ for a given target radius $R$ scales as $\sigma^* \propto R$. For $\ell_\infty$ threat models (the more common practical concern), the certificate shrinks by a factor of $\sqrt{d}$, making randomized smoothing essentially useless for high-dimensional $\ell_\infty$ robustness.
 
 ---
 
-## Lipschitz Networks and Spectral Normalization
+## Lipschitz Networks and What They Trade Away
 
-A classifier $$f$$ with Lipschitz constant $$\text{Lip}(f) = L$$ satisfies:
+A classifier with global Lipschitz constant $L$ — meaning $\lVert f(x) - f(x') \rVert_2 \leq L \lVert x - x' \rVert_2$ for all $x, x'$ — satisfies a robustness certificate by construction: if the margin at $x$ is $\gamma(x) = f(x)_{y} - \max_{y'\neq y} f(x)_{y'}$, then the certified $\ell_2$ radius is $\gamma(x)/(2L)$.
 
-$$\|f(x) - f(x')\|_2 \leq L \|x - x'\|_2 \quad \forall x, x' \in \mathcal{X}$$
+For a deep network with layers $f = f_K \circ \cdots \circ f_1$, the Lipschitz constant satisfies $\text{Lip}(f) \leq \prod_k \sigma_{\max}(W_k)$ where $\sigma_{\max}(W_k)$ is the spectral norm of the $k$-th weight matrix. **Spectral normalization** constrains each $\sigma_{\max}(W_k) \leq 1$, ensuring $\text{Lip}(f) \leq 1$. The problem is that this is extremely aggressive: a network with unit Lipschitz constant can only assign confidence proportional to the $\ell_2$ distance to the decision boundary, and natural data distributions do not organize themselves in $\ell_2$-separated clusters.
 
-For a $$K$$-class classifier $$f: \mathbb{R}^d \to \mathbb{R}^K$$, if $$f(x)_y - \max_{y' \neq y} f(x)_{y'} \geq \gamma > 0$$ (margin $$\gamma$$) and $$\text{Lip}(f) \leq L$$, then for any $$x' \in \mathcal{B}_2(x, \epsilon)$$:
+Empirically, spectrally-normalized networks on CIFAR-10 achieve roughly 55% clean accuracy with $R = 0.14$ certificates — compared to 67% clean accuracy with $R = 0.5$ certificates from randomized smoothing. The Lipschitz approach gives tighter guarantees per unit accuracy loss at small radii, but does not scale to larger radii as gracefully. Orthogonal networks (where $W_k^T W_k = I$ at every layer) give exactly unit spectral norm while preserving more representational power, and recent work on Cayley parameterizations achieves 69% clean accuracy with $R = 0.36$ certificates.
 
-$$f(x')_y - \max_{y' \neq y} f(x')_{y'} \geq \gamma - 2L\epsilon$$
-
-The classifier is certifiably correct on $$\mathcal{B}_2(x, \epsilon)$$ when $$\epsilon < \gamma / (2L)$$. The certified radius is $$R_{\text{cert}}(x) = \frac{\gamma(x)}{2L}$$ where $$\gamma(x)$$ is the margin at $$x$$.
-
-For a neural network with layers $$f = f_K \circ \cdots \circ f_1$$, the Lipschitz constant of the composition satisfies:
-
-$$\text{Lip}(f) \leq \prod_{k=1}^K \text{Lip}(f_k)$$
-
-For a linear layer $$f_k(h) = W_k h$$, $$\text{Lip}(f_k) = \|W_k\|_2 = \sigma_{\max}(W_k)$$ (the spectral norm, i.e., largest singular value). For ReLU activations, $$\text{Lip}(\text{ReLU}) = 1$$. So:
-
-$$\text{Lip}(f) \leq \prod_{k=1}^K \sigma_{\max}(W_k)$$
-
-**Spectral normalization** (Miyato et al.) constrains each layer's spectral norm to $$\leq 1$$ during training:
-
-$$\bar{W}_k = \frac{W_k}{\sigma_{\max}(W_k)}$$
-
-This guarantees $$\text{Lip}(f) \leq 1$$ but is too aggressive — unit Lipschitz constant severely limits the network's expressiveness. **Orthogonal networks** (where all weight matrices are orthogonal: $$W_k^T W_k = I$$) achieve exactly unit spectral norm at each layer while preserving more expressiveness, since orthogonal matrices preserve norms.
-
-The tightest known Lipschitz bound for deep ReLU networks uses the **singular value decomposition** of the composition:
-
-$$\text{Lip}(f) = \sup_{x \neq x'} \frac{\|f(x) - f(x')\|_2}{\|x-x'\|_2} = \sup_x \|J_f(x)\|_2$$
-
-where $$J_f(x) = \prod_{k=1}^K D_k W_k$$ is the Jacobian (with $$D_k = \text{diag}(\mathbf{1}[W_k h_{k-1} \geq 0])$$ the activation mask). Computing this exactly is NP-hard, but semidefinite programming (SDP) relaxations give tight upper bounds:
-
-$$\text{Lip}(f)^2 \leq \min_\lambda \left\{\lambda : \begin{pmatrix} \lambda I & W_K^T D_K \cdots W_1^T D_1 \\ D_1 W_1 \cdots D_K W_K & I \end{pmatrix} \succeq 0\right\}$$
+The fundamental tension is this: a classifier cannot be simultaneously accurate and robust under arbitrary perturbations if the threat model allows perturbations large enough to reach other-class examples. This is not a statement about architectures or training procedures. It is a theorem.
 
 ---
 
-## PAC-Bayesian Robustness Bounds
+## The Accuracy-Robustness Tradeoff Is a Theorem
 
-**PAC-Bayesian theory** provides generalization bounds that hold for randomized classifiers. For robustness, the PAC-Bayes framework gives bounds on the adversarial risk of a distribution $$Q$$ over classifiers.
+**Zhang et al. (2019)** formalized the tradeoff. For any classifier and any distribution $\mathcal{D}$:
 
-Let $$P$$ be a prior over classifiers (before seeing data), $$Q$$ be a posterior, and $$\hat{R}_{\text{adv}}(Q)$$ the empirical adversarial risk of $$Q$$. The **PAC-Bayes theorem** states: with probability $$\geq 1 - \delta$$ over the training set of size $$n$$:
+$$R_{\text{adv}}(f, \epsilon) \geq R(f) + \underbrace{\mathbb{E}_x\!\left[\max_{c \neq f(x)} P\!\left(\mathcal{B}(x,\epsilon) \cap \{x' : y(x') = c\}\right)\right]}_{\text{boundary overlap}} - \eta^*$$
 
-$$R_{\text{adv}}(Q) \leq \hat{R}_{\text{adv}}(Q) + \sqrt{\frac{D_{\text{KL}}(Q \| P) + \ln(n/\delta)}{2n}}$$
+where $\eta^*$ is the Bayes error and $\mathcal{B}(x,\epsilon)$ is the perturbation ball. The middle term — **boundary overlap** — measures how much probability mass from other classes lies within distance $\epsilon$ of each test point. If two classes have examples that are $\epsilon$-close, any classifier must either make errors on clean inputs (putting the boundary through that region) or make errors on adversarial inputs (being fooled by the perturbation across the boundary).
 
-The bound involves only $$D_{\text{KL}}(Q \| P)$$ — the KL divergence between posterior and prior — not the parameter count. For overparameterized networks, $$D_{\text{KL}}(Q \| P) \ll d$$ when the posterior concentrates on a low-dimensional submanifold of parameter space (i.e., when the model has low RLCT, connecting back to SLT). The bound is tight precisely when the model is implicitly regularized by the training procedure.
-
-Combining PAC-Bayes with Lipschitz constraints gives the **robust PAC-Bayes bound** (Viallard et al.). For a stochastic classifier $$Q_\sigma(x) = \int f(x + \delta; \theta) dQ(\theta) d\mathcal{N}(\delta; 0, \sigma^2)$$:
-
-$$R_{\text{adv}}(Q_\sigma, \epsilon) \leq \hat{R}(Q_\sigma) + \frac{1}{\sqrt{2\pi}\sigma}\epsilon + \sqrt{\frac{D_{\text{KL}}(Q \| P) + \ln(n/\delta)}{2n}}$$
-
-The three terms are: (1) empirical clean loss, (2) robustness gap proportional to $$\epsilon/\sigma$$ (attack budget divided by smoothing noise — recovers the randomized smoothing bound), and (3) generalization gap proportional to $$\sqrt{D_{\text{KL}}/n}$$.
-
----
-
-## The Accuracy-Robustness Tradeoff: A Theorem
-
-An important theoretical result: standard accuracy and adversarial robustness are in tension, and this tension is not an artifact of current methods but a consequence of data geometry.
-
-**Theorem (Zhang et al., 2019):** For any classifier $$f$$ and any distribution $$\mathcal{D}$$ with Bayes error $$\eta^*$$:
-
-$$R_{\text{adv}}(f, \epsilon) \geq R(f) + \mathbb{E}_x\left[\max_{c \neq f(x)} P(\text{overlap}(c, f(x), \epsilon))\right] - \eta^*$$
-
-where $$\text{overlap}(c, c', \epsilon)$$ is the probability mass in the intersection of the $$\epsilon$$-neighborhoods of inputs with labels $$c$$ and $$c'$$.
-
-The overlap term is the **inherent robustness barrier**: when two classes have nearby examples (as in natural datasets where semantically similar images have different labels), any classifier must be wrong either on some clean inputs or on some adversarial inputs of those inputs. Reducing robustness error requires reducing overlap — separating the classes' $$\epsilon$$-neighborhoods — which requires assigning correct labels to regions between classes, which increases the complexity of the decision boundary and thus the clean error.
-
-Formally, define the **robust Bayes error**:
-
-$$\eta^*_{\text{adv}}(\epsilon) = \mathbb{E}_x\left[\min_c P_{x' \sim \mathcal{B}(x,\epsilon) \cap \mathcal{D}}(y(x') \neq c)\right]$$
-
-This is the error of the optimal robust classifier — the minimum possible adversarial error. For the standard CIFAR-10 distribution with $$\epsilon = 8/255$$ under $$\ell_\infty$$, theoretical estimates give $$\eta^*_{\text{adv}} \approx 5\%$$ robust error, compared to $$\eta^* \approx 0.5\%$$ clean error. The fundamental barrier is roughly a 10× increase in irreducible error, entirely due to class overlap at the given perturbation radius.
+For CIFAR-10 with $\epsilon = 8/255$ in $\ell_\infty$, a theoretical estimate of the overlap term gives a minimum achievable adversarial error of roughly 5%, compared to a Bayes clean error below 0.5%. The gap between those numbers — roughly a factor of 10 in irreducible error — is an inherent property of the data distribution at this perturbation radius. No training procedure can close it. The ceiling on robustness is set by geometry, not by model capacity.
 
 ---
 
 ## Concentration of Measure and the Inevitability of Adversarial Examples
 
-The deepest explanation for adversarial examples is **concentration of measure** — a high-dimensional probability phenomenon that has nothing specifically to do with neural networks.
+The deepest explanation for adversarial vulnerability is a pure probability theorem with no reference to learning at all. **Lévy's theorem** on the concentration of measure on the sphere states: for any 1-Lipschitz function $f: S^{d-1} \to \mathbb{R}$ with median $M$,
 
-**Lévy's theorem:** On the $$d$$-dimensional sphere $$S^{d-1}$$ with the uniform probability measure $$\mu$$ and geodesic distance, for any function $$f: S^{d-1} \to \mathbb{R}$$ with median $$M_f$ and Lipschitz constant $$L$$:
+$$\mu\!\left(\{\lvert f(x) - M \rvert \geq t\}\right) \leq 2\exp\!\left(-\frac{(d-2)t^2}{2}\right)$$
 
-$$\mu(\{x : |f(x) - M_f| \geq t\}) \leq 2\exp\left(-\frac{(d-2)t^2}{2L^2}\right)$$
+The measure concentrates around the median with Gaussian tails, and the width of the concentration band shrinks as $O(1/\sqrt{d})$. For a binary classifier, the median is 0 or 1, and most of the sphere lies within $O(1/\sqrt{d})$ of the equator — the decision boundary.
 
-The measure concentrates exponentially in $$d$$ around the median. Equivalently: most points on a high-dimensional sphere are close to the median of any Lipschitz function. For a binary function $$f$$ (a classifier), the median is either 0 or 1, and most points are near the boundary between the two regions — near the **equator** of the sphere.
+In $d = 10^6$ dimensions, the typical distance from a uniformly random point to the decision boundary of any continuous binary function is of order $10^{-3}$. This is independent of how the classifier was trained. Any continuous decision function on a high-dimensional sphere has adversarial examples within $O(1/\sqrt{d})$ of most correctly classified points — not because the model is poorly trained, but because the sphere has that shape.
 
-For neural network classifiers, this manifests as: for any continuous function $$f: \mathbb{R}^d \to \{0,1\}^K$$, most correctly classified test points lie near the decision boundary. The distance to the boundary concentrates around a value that decays as $$O(1/\sqrt{d})$$. In $$d = 10^6$$ dimensions, the typical distance to the decision boundary is of order $$10^{-3}$$ — far smaller than any human-perceptible perturbation.
-
-This is the measure-theoretic proof that adversarial examples are **inevitable** for any classifier in high dimensions that uses all available features. The argument does not assume anything about the classifier's architecture or training procedure — it holds for any continuous decision function on high-dimensional input space. The only escape is to use classifiers that are explicitly constrained to ignore most dimensions (sparse classifiers) or to use a threat model $$\mathcal{B}(x,\epsilon)$$ that is small enough to avoid the concentration regime.
+The practical consequence is that adversarial vulnerability in high dimensions is not evidence of poor generalization or insufficient training. It is a consequence of the same high dimensionality that makes these spaces so expressive. The only models that escape concentration of measure are those that rely on very few features (sparse classifiers) or those that operate in a threat model small enough to stay in the concentrated band. Both approaches sacrifice something: sparse classifiers ignore available features, and small threat models do not defend against the perturbations that matter empirically.
 
 ---
 
-## Interval Bound Propagation and Complete Verification
+## Complete Verification and Its Limits
 
-**Interval Bound Propagation (IBP)** is the simplest sound (but incomplete) verification method. For a neural network layer $$h^{(k+1)} = \sigma(W_k h^{(k)} + b_k)$$, if $$h^{(k)} \in [\underline{h}^{(k)}, \overline{h}^{(k)}]$$ (componentwise), then:
+Empirical defenses (adversarial training, data augmentation) can raise the cost of an attack but cannot prove robustness. The alternative — **complete verification** — is to check, for every test point, that no perturbation within the threat model changes the prediction.
 
-$$\underline{h}^{(k+1)} = \sigma(W_k^+ \underline{h}^{(k)} + W_k^- \overline{h}^{(k)} + b_k)$$
-$$\overline{h}^{(k+1)} = \sigma(W_k^+ \overline{h}^{(k)} + W_k^- \underline{h}^{(k)} + b_k)$$
+For ReLU networks, this can be cast as a mixed-integer linear program (MILP). Each ReLU unit has an activation pattern (on/off), and the $2^N$ possible patterns for $N$ hidden neurons define $2^N$ linear regions. Verifying robustness within each region is a linear program (LP); verifying across all regions is the exponentially hard MILP. Branch-and-bound with LP relaxations (the LP relaxes each ReLU to an interval constraint, giving an outer approximation of the reachable output set) gives the best practical performance.
 
-where $$W^+ = \max(W, 0)$$ and $$W^- = \min(W, 0)$$. This propagates interval bounds through each layer in closed form, requiring only two forward passes per layer.
+Practically, complete verification is feasible for networks with up to a few thousand neurons. For the networks used in practice — ResNets with millions of parameters — complete verification is computationally intractable. **Interval Bound Propagation (IBP)**, which propagates simple interval bounds through each layer, scales to large networks but is conservative: the verified radius it computes is typically far smaller than the true robust radius because interval arithmetic ignores correlations between neurons. An IBP-verified ResNet-50 achieves roughly 36% certified accuracy at $\epsilon = 2/255$ on CIFAR-10, while adversarially trained models without certificates achieve 67% empirical robustness at the same radius.
 
-IBP is sound: if the output bounds show that the logit for the correct class exceeds all other logits, the classifier is certifiably robust. But it is loose: the intervals grow exponentially with depth due to the Lipschitz multiplication at each layer. For deep networks, IBP produces vacuous bounds unless the network is trained with IBP-aware regularization that constrains the spectral norms.
-
-**Complete verification** (via Mixed Integer Linear Programming) is NP-hard but exact. The MILP formulation encodes the ReLU as a binary variable $$z_i \in \{0,1\}$$ (active or inactive) and solves:
-
-$$\min_{x', z} f(x')_y - \max_{y' \neq y} f(x')_{y'}$$
-subject to: $$x' \in \mathcal{B}(x, \epsilon)$$, ReLU constraints, $$z_i \in \{0,1\}$$
-
-If the optimal value is $$\geq 0$$, the network is certifiably robust. The hardness comes from the combinatorial explosion in activation patterns: $$2^N$$ possible patterns for $$N$$ hidden neurons. Branch-and-bound with LP relaxations ($$\ell_1$$-approximation of the ReLU) provides the best practical algorithms.
+The gap between certified and empirical robustness reflects the looseness of the certificate — not fraud, but proof theory: IBP is sound (certified inputs are truly robust) but incomplete (non-certified inputs may also be robust). Tightening the gap is an active research area with a clear character: it requires tighter approximations of the reachable set of activations, which in turn requires more computation per verification query.
 
 ---
 
-## Philosophical Implications: Robustness as a Topological Problem
+## The Shape of the Problem
 
-The mathematical view of adversarial robustness suggests that it is fundamentally a **topological problem**: the question of whether a decision boundary can be arranged to have margin $$\epsilon$$ everywhere, given the topology of the data distribution.
+Putting the pieces together, adversarial robustness resolves into three distinct sub-problems that live at different levels of abstraction.
 
-The **Jordan curve theorem** (generalized to high dimensions as the **Jordan-Brouwer separation theorem**) states that a continuous injective map $$S^{d-1} \hookrightarrow S^d$$ separates $$S^d$$ into exactly two connected components. Any decision boundary that separates two classes in $$\mathbb{R}^d$$ is such a hypersurface. The robustness of the classifier is determined by the **reach** of this hypersurface: the largest $$\epsilon$$ such that every point within distance $$\epsilon$$ of the boundary has a unique closest boundary point.
+The first is **geometric**: the decision boundary of any accurate classifier on natural data is close to most test points, because natural data distributions of different classes overlap at the scale of humanly-imperceptible perturbations. This is a property of the data, not the model.
 
-Boundaries with low reach — boundaries that come close to themselves, have sharp corners, or approach the support of the data distribution — are inherently fragile. Maximizing robustness requires maximizing reach, which requires smoothing the decision boundary away from the data support. But the data distribution constrains where the boundary must go: between classes, and close to all the class-overlapping points identified by the robustness barrier theorem.
+The second is **computational**: even if we had a perfect classifier with the maximum achievable robust radius, verifying its robustness requires solving problems that are NP-hard in general. The best we can do in practice is outer approximations that trade completeness for scalability.
 
-The accurate picture of adversarial robustness, then, is this: we are trying to place a smooth, high-reach hypersurface between two interleaved, high-dimensional point clouds, where the clouds are close together in the directions of many input features. The topology allows this surface to exist, but its reach is bounded by the minimum distance between the clouds — which, in high dimensions and natural data distributions, is small. Certified defense methods are methods for provably placing the boundary at a given reach from all training and test points. The fundamental limits come from the geometry of the data, not from any deficiency in our defenses.
+The third is **statistical**: there is an inherent tradeoff between standard accuracy and adversarial robustness, because robustness requires separating classes in the perturbation metric, and class overlap makes this separation imperfect. The tradeoff is not an artifact of current methods. It is a lower bound derived from the data distribution.
 
-This is not a counsel of despair. It suggests where progress can be made: in learning data representations where the class-conditional distributions are more separated (representation learning for robustness), in defining threat models that better match human perception (semantic robustness), and in certifying robustness in the representation space rather than the pixel space. The mathematics is clear about the limits. It is equally clear about the directions in which those limits can be pushed.
+This is not a pessimistic picture. It tells us precisely what we can and cannot improve. We cannot change the geometry of the data, but we can choose perturbation metrics that better reflect human perception, reducing the class overlap at the relevant scale. We cannot avoid NP-hardness in general, but we can design architectures that are easier to verify (Lipschitz, orthogonal, interval-analyzable). And we cannot close the accuracy-robustness gap below its fundamental lower bound, but we can get closer to it.
+
+Understanding what is mathematically inevitable is the first step toward knowing where the remaining room for progress lies.

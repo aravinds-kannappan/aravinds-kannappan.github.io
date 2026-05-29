@@ -9,153 +9,114 @@ tags:
   - AI
 ---
 
-Interpretability research often proceeds empirically: find a circuit, patch an activation, ablate a head, observe the behavioral change. This is valuable work, but it lacks a theory of *why* neural networks form the internal structures they do — why circuits emerge at all, why features are represented in superposition, why some behaviors are localized and others distributed. Singular Learning Theory (SLT), developed by Sumio Watanabe over two decades of statistical mathematics, provides the deepest available mathematical account of these questions. It begins with an observation that the field of machine learning spent decades overlooking: the models we train are not regular statistical models, and their irregularity is not a nuisance — it is the source of their generalization and the key to understanding their internal structure.
+Ask a mechanistic interpretability researcher why neural networks form the circuits they do and you will get an honest answer: we observe them, name them, and ablate them, but we lack a theory of why they emerge. This is not a complaint about the field — the empirical discoveries are real and important. It is a statement about what is missing. What we need is a mathematical account of why, given a data distribution and an architecture, gradient descent converges to representations with specific structural properties rather than others.
+
+Singular Learning Theory (SLT), developed by Sumio Watanabe across a series of papers and a 2009 monograph, provides that account. It begins with an observation that is easy to state and took decades to fully appreciate: neural networks are not regular statistical models, and their irregularity is not a nuisance to be engineered around. It is the source of their generalization, and it is the key to understanding what their representations mean.
 
 ---
 
-## The Failure of Regular Statistical Theory
+## The Problem With Regular Models
 
-Classical statistical learning theory assumes models are **regular**: that the Fisher information matrix $$F(\theta)$$ is non-singular at all parameter values, that maximum likelihood estimators are asymptotically normal, and that the model's true complexity is well-approximated by its parameter count. These assumptions fail catastrophically for neural networks.
+Classical statistical theory rests on an assumption so basic it often goes unstated: the model is *regular*. Formally, this means the Fisher information matrix $F(\theta)$ is nonsingular at the true parameter $\theta^*$, so the log-likelihood landscape near the optimum is well-approximated by a bowl-shaped quadratic. Under regularity, maximum likelihood estimators are asymptotically normal, model complexity is well-captured by parameter count, and the Bayesian information criterion
 
-At a parameter value $$\theta^*$$ where the network implements the true function $$f^*$$, the Fisher information matrix is generically **singular**. The null space of $$F(\theta^*)$$ — the set of parameter perturbations that do not change the network's input-output function — is non-trivial. This null space has dimension equal to the number of **symmetries** of the parameterization: permutation of hidden units, rescaling of weights between layers, and more subtle symmetries in deep networks.
+$$\text{BIC} = -2\log p(\text{data} \mid \hat\theta) + d\log n$$
 
-The consequence is that the loss landscape near $$\theta^*$$ is not quadratic — it is a polynomial of degree higher than two, with a complicated zero set. This zero set $$W_0 = \{\theta : L(\theta) = L^*\}$$, the set of globally optimal parameters, is not an isolated point but a **real algebraic variety** — the intersection of polynomial equations in parameter space.
+gives a reliable estimate of generalization, where $d$ is the number of parameters and $n$ is the sample size.
 
-**Definition (Singularity):** A parameter $$\theta^* \in W_0$$ is a **singular point** of the loss landscape if the Hessian $$\nabla^2 L(\theta^*)$$ is singular. At singular points, the normal approximation to the posterior breaks down, and the standard Bayesian information criterion (BIC) — which assumes the Hessian determines model complexity — gives the wrong answer.
+Neural networks violate regularity comprehensively. At any parameter $\theta^*$ that implements the true function, the Fisher matrix is generically singular. Its null space — the set of parameter perturbations that leave the network's input-output mapping unchanged — is large. It includes permuting hidden units, rescaling weights between layers, and more subtle symmetries that grow with depth. The consequence is that the loss landscape near $\theta^*$ is not a bowl. It is a polynomial of degree higher than two, and its zero set $W_0 = \{\theta : L(\theta) = L^*\}$ is not an isolated point but a real algebraic variety — a high-dimensional surface of equivalent solutions, with a complex topology that depends on the network architecture and the data distribution.
+
+This matters because the BIC uses $d\log n$ as its complexity penalty, implicitly assuming all $d$ parameters do independent work. For a singular model, many parameters are redundant — the effective complexity is lower, the model generalizes better than BIC predicts, and a different mathematical object is needed to describe what is really happening.
 
 ---
 
-## Real Log Canonical Thresholds
+## The Real Log Canonical Threshold
 
-The correct measure of effective model complexity at a singular point is the **real log canonical threshold (RLCT)**, also called the learning coefficient $$\lambda$$.
+That object is the **real log canonical threshold (RLCT)**, also called the learning coefficient $\lambda$. To define it, let $K(\theta) = \mathbb{E}[\log p_{\theta^*}/p_\theta]$ be the KL divergence from the optimal model — it measures how far a parameter $\theta$ is from the optimal function in an information-theoretic sense. Near the optimal set $W_0$, $K(\theta)$ vanishes on $W_0$ and grows as a polynomial as you move away from it. The RLCT is extracted from the **zeta function** of the loss:
 
-Let $$L(\theta) = -\frac{1}{n}\sum_{i=1}^n \log p_\theta(x_i)$$ be the empirical loss, and $$K(\theta) = \mathbb{E}[\log p_{\theta^*}/p_\theta]$$ be the true KL divergence from the optimal model. Define the **zeta function** of the loss:
+$$\zeta(z) = \int_\Theta K(\theta)^z \, \varphi(\theta) \, d\theta$$
 
-$$\zeta(z) = \int_\Theta K(\theta)^z \varphi(\theta) \, d\theta$$
-
-where $$\varphi(\theta)$$ is a prior density. This integral is holomorphic for $$\text{Re}(z) > 0$$ but has a meromorphic continuation to the entire complex plane. The **learning coefficient** $$\lambda$$ is minus the largest pole of $$\zeta(z)$$:
+where $\varphi(\theta)$ is a prior density. This integral is holomorphic for $\text{Re}(z) > 0$ and has a meromorphic continuation to the complex plane. The RLCT $\lambda$ is minus the largest pole:
 
 $$\lambda = -\max\{z \in \mathbb{R} : \zeta(z) \text{ has a pole at } z\}$$
 
-For regular models, $$\lambda = d/2$$ where $$d$$ is the parameter dimension — this recovers the classical BIC. For singular models, $$\lambda < d/2$$, reflecting the fact that the model's effective complexity is less than its parameter count. The **multiplicity** $$m$$ of the pole determines the logarithmic corrections.
-
-Watanabe's **free energy formula** (his central theorem) states that the Bayesian generalization error satisfies:
-
-$$\mathbb{E}[G_n] = \frac{\lambda}{n} - \frac{m-1}{n}\log\log n + O\left(\frac{1}{n}\right)$$
-
-and the Bayesian free energy (negative log marginal likelihood) satisfies:
+The pole's multiplicity $m$ captures logarithmic correction terms. Together, $\lambda$ and $m$ appear in Watanabe's central theorem: the Bayesian free energy (negative log marginal likelihood) satisfies
 
 $$F_n = nL_n + \lambda \log n - (m-1)\log\log n + O_p(1)$$
 
-where $$L_n$$ is the empirical training loss. The term $$\lambda \log n$$ replaces the $$\frac{d}{2}\log n$$ term of the classical BIC. Because $$\lambda \leq d/2$$ for singular models, singular models are *penalized less* for complexity — they generalize better than their parameter count suggests.
+and the expected generalization error satisfies
+
+$$\mathbb{E}[G_n] = \frac{\lambda}{n} - \frac{m-1}{n}\log\log n + O\!\left(\frac{1}{n}\right)$$
+
+For regular models, $\lambda = d/2$ and $m = 1$, exactly recovering the BIC. For singular models, $\lambda < d/2$ — the model is penalized *less* for complexity, and this reduced penalty directly explains why overparameterized networks generalize: their effective complexity, as measured by $\lambda$, is much smaller than their parameter count.
+
+The computation of $\lambda$ for a specific architecture requires **resolution of singularities** — a classical algebraic geometry result (Hironaka, 1964) guaranteeing that any algebraic variety can be desingularized by a finite sequence of coordinate changes called blowups. After blowing up the singular points of $K(\theta)$ into normal crossing divisors, the zeta function becomes a standard multidimensional integral whose poles can be read off directly.
+
+For a three-layer network with $H$ hidden units mapping $\mathbb{R}^m \to \mathbb{R}^H \to \mathbb{R}^n$ with tanh activations, the result is:
+
+$$\lambda = \frac{1}{2}\min_{k_1 + k_2 \leq H} \left[\frac{m k_1 - k_1^2}{2} + \frac{k_2 n - k_2^2}{2} + k_1 k_2\right]$$
+
+minimized over integer decompositions of the hidden layer. This formula is structurally revealing: $\lambda$ depends not on the total parameter count but on how the hidden layer's width relates to the input and output dimensions. Wider-than-necessary hidden layers do not increase $\lambda$ proportionally — they increase it sublinearly, because the additional units contribute to the null space of $F(\theta^*)$ rather than to genuinely independent parameters.
 
 ---
 
-## Computing $$\lambda$$ for Neural Networks
+## Phase Transitions and Grokking
 
-The RLCT is a birational invariant from algebraic geometry. For a polynomial map $$f: \mathbb{R}^d \to \mathbb{R}^k$$ representing the KL divergence $$K(\theta) = \|f(\theta)\|^2$$ near a singular point, the RLCT is computed via **resolution of singularities** — a classical result of Hironaka guaranteeing that any algebraic variety can be desingularized by a finite sequence of blowups.
+SLT's second major insight concerns how a model's internal representations evolve during training. As the sample size $n$ grows, the Bayesian posterior
 
-For a 3-layer network with $$H$$ hidden units mapping $$\mathbb{R}^m \to \mathbb{R}^H \to \mathbb{R}^n$$ (tanh activations), Watanabe and collaborators computed:
+$$\varphi_n(\theta) \propto \exp(-nL_n(\theta))\,\varphi(\theta)$$
 
-$$\lambda = \frac{1}{2}\min_{k_1 + k_2 \leq H} \left(\frac{m \cdot k_1 - k_1^2}{2} + \frac{k_2 \cdot n - k_2^2}{2} + k_1 k_2\right)$$
+undergoes a sequence of abrupt reorganizations. Initially the posterior spreads across parameter space (underfitting). As $n$ increases, it concentrates on the optimal set $W_0$. But $W_0$ is not a connected manifold in general — it has multiple connected components with different values of $\lambda$. The posterior concentrates first on the component with the highest $\lambda$ (least singular), then, as evidence accumulates, undergoes a first-order phase transition to the component with lower $\lambda$ (more singular, better generalization).
 
-subject to constraints on the network's rank. The formula involves minimizing over the decomposition of the hidden layer into two ranks $$k_1, k_2 \leq H$$ — the RLCT is determined by the most singular decomposition of the weight matrices.
+This is the SLT account of **grokking** — the striking phenomenon where a model trained on a small dataset first memorizes it (high training accuracy, low test accuracy), then suddenly generalizes far later in training. The memorization regime corresponds to the posterior sitting on a high-$\lambda$ component of $W_0$. The generalization transition is the phase transition to a lower-$\lambda$ component. The delay between memorization and generalization reflects the time needed to accumulate enough evidence to overcome the free energy barrier between components.
 
-For ReLU networks, the situation is more complex because the piecewise-linear activation creates a **stratified** parameter space — different activation patterns correspond to different polynomial maps, and the RLCT must be computed separately on each stratum and then assembled via the minimum:
-
-$$\lambda = \min_{\sigma \in \{0,1\}^H} \lambda_\sigma$$
-
-where $$\sigma$$ indexes the activation pattern and $$\lambda_\sigma$$ is the RLCT on the corresponding stratum.
-
-The key result: **smaller $$\lambda$$ corresponds to a more singular loss landscape, which corresponds to more parameter symmetry, which corresponds to more regularized and interpretable representations.** The RLCT is a formal measure of how "overparameterized" a model is — how many of its degrees of freedom are redundant — and this redundancy is precisely the condition under which simple, human-interpretable features can emerge.
-
----
-
-## Phase Transitions and Developmental Interpretability
-
-Singular learning theory predicts that as a model trains, it undergoes **phase transitions** — abrupt changes in the structure of its parameter distribution. These transitions occur at critical sample sizes where the posterior distribution suddenly concentrates on a lower-dimensional stratum of the parameter space.
-
-Define the **Bayesian posterior** $$\varphi_n(\theta) \propto \exp(-nL_n(\theta))\varphi(\theta)$$. As $$n$$ increases from 0, the posterior initially spreads over the entire parameter space (underfitting regime), then concentrates on the variety $$W_0$$ (interpolation regime), then concentrates on specific connected components of $$W_0$$ determined by the data structure (representation learning regime).
-
-The transitions between these regimes are characterized by changes in $$\lambda$$. When the posterior crosses from a higher-$$\lambda$$ to a lower-$$\lambda$$ stratum, the model undergoes a phase transition in which:
-
-1. The free energy decreases discontinuously relative to the BIC prediction
-2. The model's internal representations reorganize
-3. New interpretable features appear
-
-This is the SLT account of **grokking** — the phenomenon where models suddenly generalize after extended training. Grokking is a phase transition in the posterior from a high-$$\lambda$$ stratum (memorization, poor generalization) to a low-$$\lambda$$ stratum (structured representation, good generalization). The transition is delayed because the posterior must accumulate sufficient evidence to escape the higher-$$\lambda$$ stratum, even though the lower-$$\lambda$$ stratum has better free energy.
+The phase transition is not smooth. In experiments on modular addition with small transformers, the transition from memorization to generalization occurs over a narrow range of training steps, the test loss drops sharply (not gradually), and the internal representations reorganize simultaneously — a Fourier-mode structure appears in the embedding weights within hundreds of steps of the transition. SLT predicts exactly this: because the transition is between discrete components of $W_0$ with different $\lambda$, it is necessarily discontinuous.
 
 ---
 
 ## Superposition as a Compressed Sensing Problem
 
-One of the most studied phenomena in interpretability is **superposition**: the observation that neural networks represent more features than they have neurons, by storing multiple features in overlapping directions in activation space. SLT provides a principled mathematical account of when and why this occurs.
+One of the most studied phenomena in interpretability is **superposition**: networks represent more features than they have neurons by encoding multiple features in overlapping, nonorthogonal directions in activation space. The naive expectation would be one feature per neuron; the observation is a feature count that scales superlinearly with neuron count. Why?
 
-Let $$\mathbf{h} \in \mathbb{R}^d$$ be an activation vector and suppose there are $$n \gg d$$ features $$f_1, \ldots, f_n \in \mathbb{R}$$ that the network wants to represent. The network encodes them as:
+The compressed sensing framework makes this precise. Let $\mathbf{h} \in \mathbb{R}^d$ be an activation vector, and suppose the network wants to represent $n \gg d$ sparse features $\mathbf{f} \in \mathbb{R}^n$ (sparse meaning most entries are near zero at any given time). The encoding is $\mathbf{h} = W\mathbf{f}$, with $W \in \mathbb{R}^{d \times n}$. This is underdetermined — more features than dimensions — and recovery requires that the encoding matrix $W$ satisfy the **Restricted Isometry Property (RIP)**:
 
-$$\mathbf{h} = W\mathbf{f} + \epsilon$$
+$$(1-\delta_s)\lVert\mathbf{f}\rVert^2 \leq \lVert W\mathbf{f}\rVert^2 \leq (1+\delta_s)\lVert\mathbf{f}\rVert^2$$
 
-where $$W \in \mathbb{R}^{d \times n}$$ is the encoding matrix and $$\epsilon$$ is noise. Recovering $$\mathbf{f}$$ from $$\mathbf{h}$$ requires solving an underdetermined system — a compressed sensing problem.
+for all $s$-sparse vectors $\mathbf{f}$, with $\delta_s < \sqrt{2}-1$. When RIP holds, $\ell_1$-minimization exactly recovers sparse features from the compressed representation.
 
-The **Restricted Isometry Property (RIP)** states that a matrix $$W$$ satisfies RIP of order $$s$$ with constant $$\delta_s$$ if for all $$s$$-sparse vectors $$\mathbf{f}$$ (at most $$s$$ nonzero entries):
+The fundamental result of compressed sensing is that random $d \times n$ matrices satisfy RIP with high probability when $n = O(d^2)$ — the number of recoverable sparse features scales quadratically with the number of neurons, not linearly. This is precisely the empirical observation: networks trained on tasks with many sparse features organize their weights into near-equiangular tight frames, which achieve the $d(d+1)/2$ Welch bound on the number of equiangular directions in $\mathbb{R}^d$.
 
-$$(1-\delta_s)\|\mathbf{f}\|^2 \leq \|W\mathbf{f}\|^2 \leq (1+\delta_s)\|\mathbf{f}\|^2$$
-
-If $$W$$ satisfies RIP with $$\delta_{2s} < \sqrt{2} - 1$$, then the $$\ell_1$$ minimization program:
-
-$$\hat{\mathbf{f}} = \arg\min_{\mathbf{f}'} \|\mathbf{f}'\|_1 \quad \text{subject to} \quad W\mathbf{f}' = \mathbf{h}$$
-
-recovers $$\mathbf{f}$$ exactly when it is $$s$$-sparse, with error at most $$C\|\mathbf{f} - \mathbf{f}_s\|_1 / \sqrt{s}$$ otherwise (where $$\mathbf{f}_s$$ is the best $$s$$-sparse approximation).
-
-Superposition is, precisely, a network that stores sparse features in a low-dimensional space by exploiting the RIP: the weight matrix $$W$$ encodes $$n$$ features into $$d \ll n$$ neurons while approximately preserving inner products between sparse feature combinations. The features the network chooses to represent are those that are **both important and sparse in the natural data distribution** — because RIP guarantees reliable recovery only for sparse feature patterns.
-
-The number of features representable in superposition scales as $$n = O(d^2)$$ for random unit-norm frames (achieving $$d(d+1)/2$$ equiangular tight frame bound) — quadratically in the number of neurons, not linearly. This is why interpretability researchers find "more features than neurons": the correct scaling is polynomial.
+Which features end up in superposition? The features that are most common and most sparse in the training distribution. Common features are worth representing; sparse features can be represented without much interference because they rarely co-activate. SLT connects this to the RLCT: the low-$\lambda$ region of parameter space (which gradient descent converges to) is precisely the region where the weight matrices implement near-optimal compressed sensing — RIP-satisfying frames that maximize recoverable feature count per neuron.
 
 ---
 
-## Causal Abstraction and Mechanistic Circuits
+## Causal Abstraction
 
-Mechanistic interpretability seeks to identify **circuits**: subgraphs of the computational graph that implement specific algorithmic functions. The mathematical foundation is **causal abstraction** theory, developed by Geiger, Lu, and Potts.
+The empirical side of interpretability — circuit finding, activation patching, probing — is unified by **causal abstraction** theory. A circuit is not just a subgraph of the network's computation — it is a claim that the network implements a high-level algorithm, where "implements" has a precise meaning in terms of interventions.
 
-A **causal model** is a tuple $$\mathcal{M} = (\mathbf{V}, \mathbf{E}, \mathbf{U}, \mathcal{F})$$ where $$\mathbf{V}$$ are endogenous variables, $$\mathbf{E}$$ are edges, $$\mathbf{U}$$ are exogenous noise variables, and $$\mathcal{F} = \{f_V : V \in \mathbf{V}\}$$ are structural equations $$V = f_V(\text{Pa}(V), U_V)$$.
+Two causal models are **causally abstracted** if there exists a map $\alpha$ from low-level states (activations) to high-level states (algorithm variables) such that intervening on the high-level model corresponds, through $\alpha$, to intervening on the low-level model:
 
-An **intervention** $$\text{do}(V = v)$$ sets $$V$$ to $$v$$ and removes its incoming edges, yielding the **interventional distribution** $$P(\mathbf{W} | \text{do}(V = v))$$ for any downstream variables $$\mathbf{W}$$.
+$$\alpha\!\left(\mathcal{M}_{\text{low}}^{\,\alpha^{-1}(\mathcal{I})}(\mathbf{s})\right) = \mathcal{M}_{\text{high}}^{\,\mathcal{I}}(\alpha(\mathbf{s}))$$
 
-Two causal models $$\mathcal{M}_{\text{high}}$$ (high-level, abstract) and $$\mathcal{M}_{\text{low}}$$ (low-level, neural network) are **causally abstracted** if there exists an **abstraction map** $$\alpha: \mathcal{S}_{\text{low}} \to \mathcal{S}_{\text{high}}$$ (from neural network states to high-level model states) such that for all interventions $$\mathcal{I}$$ in the high-level model and their corresponding **realizations** $$\mathcal{I}_\alpha$$ in the low-level model:
+The diagram commutes: abstract and concrete interventions are related by $\alpha$. **Interchange interventions** (setting an activation to the value it would take under a different input) test this commutativity empirically. A circuit is validated when interchange interventions on the claimed algorithmic variables produce the same output changes as the corresponding high-level interventions.
 
-$$\alpha(\mathcal{M}_{\text{low}}^{\mathcal{I}_\alpha}(\mathbf{s})) = \mathcal{M}_{\text{high}}^{\mathcal{I}}(\alpha(\mathbf{s}))$$
-
-Diagrammatically: the interventional map commutes with the abstraction map. The neural network implements the high-level algorithm if and only if this commutativity holds for all interventions.
-
-**Interchange interventions** (setting an activation to the value it would have had under a different input) test this commutativity empirically. If the commutativity holds up to approximation $$\epsilon$$ for all tested interventions, we say the network $$\epsilon$$-approximately implements the high-level algorithm. The set of interventions needed to certify a circuit is at most exponential in the circuit's depth, and polynomial in its width for sufficiently structured algorithms.
+What SLT adds to this picture: the structure of the low-level model $\mathcal{M}_{\text{low}}$ at a convergence point with small $\lambda$ is not arbitrary. The RLCT measures the degree of parameter redundancy, and highly redundant parameterizations (low $\lambda$) are precisely those where simple causal abstractions exist. A model with many equivalent parameterizations has, by definition, a large null space of parameter changes that don't affect the function — and any basis of this null space defines a natural set of "irrelevant parameters" that can be abstracted away. The abstraction map $\alpha$ is most cleanly defined at highly singular convergence points, which is why circuit structure appears most clearly in well-trained models and not in randomly initialized ones.
 
 ---
 
-## Representation Theory and Equivariance
+## Representation Theory and the Inevitability of Fourier Structure
 
-Deep networks trained on structured data — language, images, graphs — develop representations that reflect the symmetry structure of the data. This is not accidental: it is a consequence of representation theory applied to the hypothesis class.
+Perhaps the most striking concrete prediction of SLT — actually its representation-theoretic analogue — is the inevitability of Fourier representations in models trained on cyclic-symmetry tasks. **Schur's lemma** states that if $\rho$ and $\rho'$ are irreducible representations of a group $G$ and $f$ is an equivariant linear map between them, then $f = 0$ if $\rho \not\cong \rho'$ and $f = \lambda I$ if $\rho \cong \rho'$ over $\mathbb{C}$.
 
-Let $$G$$ be a group acting on input space $$\mathcal{X}$$ by $$\rho: G \to GL(\mathcal{X})$$ (a representation). A function $$f: \mathcal{X} \to \mathcal{Y}$$ is **equivariant** with respect to $$\rho$$ if:
+This means that any linear layer that respects a symmetry group $G$ must block-diagonalize along irreducible representations of $G$ — it cannot mix different irreps. For cyclic groups $\mathbb{Z}_n$ (the symmetry of modular arithmetic tasks), the irreducible representations are exactly the Fourier modes $e^{2\pi i k / n}$ for $k = 0, \ldots, n-1$.
 
-$$f(\rho(g) \cdot x) = \rho'(g) \cdot f(x) \quad \forall g \in G, x \in \mathcal{X}$$
-
-for some representation $$\rho'$$ of $$G$$ on $$\mathcal{Y}$$. Equivariant functions respect the group symmetry: transforming the input is equivalent to transforming the output.
-
-**Schur's lemma** constrains the structure of equivariant linear maps. If $$\rho$$ and $$\rho'$$ are irreducible representations of $$G$$ and $$f: V \to W$$ is an equivariant linear map, then:
-
-- If $$\rho \not\cong \rho'$$, then $$f = 0$$
-- If $$\rho \cong \rho'$$ (over $$\mathbb{C}$$), then $$f = \lambda I$$ for some scalar $$\lambda$$
-
-This means that equivariant linear layers can only mix components within the same irreducible representation — the weight matrix block-diagonalizes along irreducible components. The internal representation of a perfectly equivariant network is a direct sum of irreducible representations of $$G$$, and each irrep corresponds to an interpretable feature type.
-
-For cyclic groups $$\mathbb{Z}_n$$ (relevant to modular arithmetic tasks studied in grokking), the irreducible representations are Fourier modes $$e^{2\pi i k / n}$$ for $$k = 0, 1, \ldots, n-1$$. Networks trained on modular arithmetic tasks learn Fourier representations — not because Fourier analysis was built in, but because Fourier modes are the unique basis that diagonalizes the cyclic symmetry group, and diagonalizing the symmetry is optimal for weight sharing. Schur's lemma makes the Fourier basis inevitable.
+Networks trained on modular arithmetic tasks learn Fourier representations not because we built Fourier structure in, but because the task symmetry group is $\mathbb{Z}_n$, Schur's lemma forces any equivariant linear layer to be diagonal in the Fourier basis, and gradient descent on the cross-entropy loss preserves the symmetry because the loss is itself $\mathbb{Z}_n$-invariant. The Fourier basis is the unique basis that makes the equivariant constraint compatible with efficient learning. It is, in a precise algebraic sense, the only basis that works.
 
 ---
 
-## Philosophical Implications: What Interpretability Is Measuring
+## What This Means for Interpretability Research
 
-SLT tells us that interpretability is fundamentally about the geometry of the loss landscape near the zero set $$W_0$$. When a model is interpretable — when its computations can be decomposed into human-readable circuits — it is because the parameters lie near a singularity of low RLCT: a highly degenerate point where many parameter directions do not affect the function. Interpretable features are the natural coordinates near these singularities.
+The SLT picture synthesizes the empirical interpretability findings into a coherent theoretical frame. Circuits emerge because training converges to low-$\lambda$ points of $W_0$, where the functional structure is simple and the causal abstraction map $\alpha$ is cleanly defined. Grokking is a phase transition between components of $W_0$. Superposition is the compressed sensing solution that gradient descent finds at those low-$\lambda$ points. Fourier representations are the algebraically inevitable outcome of training on symmetric tasks.
 
-This reframes the interpretability research agenda. The question is not "how do we find the features?" but "what determines the RLCT of the region where the model converges?" The answer is the data distribution, the architecture, and the training dynamics. Architectures that create more symmetry — more parameter degeneracy — have smaller RLCT and more interpretable convergence points. Training procedures that push models toward lower-$$\lambda$$ strata produce more interpretable representations.
+What SLT cannot yet do is predict in advance which features will appear in which circuits for a given architecture and dataset. Computing $\lambda$ for real neural networks requires resolving the singularities of high-dimensional polynomial systems — a problem that is algebraically well-posed but computationally very hard. The practical path forward is to use SLT as a diagnostic: measure $\lambda$ empirically (via the Bayesian free energy on held-out data), track its changes during training, and use phase transition predictions to identify the training checkpoints where representational reorganization is most likely to occur.
 
-The hard problem of interpretability, then, is not a problem about visualization or measurement — it is a problem about algebraic geometry. Understanding why a model is interpretable requires resolving the singularities of its loss landscape, computing the RLCT at its convergence point, and identifying the irreducible representations of the symmetry groups preserved by the architecture. This is hard mathematics, not just empirical circuit-hunting. But it is the right mathematics for the right question.
+The hard problem of interpretability is not a problem of visualization or measurement. It is a problem of algebraic geometry. We are trying to understand the structure of a real algebraic variety in a billion-dimensional space, and the features we see in circuits are the natural coordinates near its most degenerate points.

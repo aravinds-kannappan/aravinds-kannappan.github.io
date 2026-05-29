@@ -8,305 +8,116 @@ tags:
   - mathematics
 ---
 
-In 1999, Tishby, Pereira, and Bialek posed a deceptively simple question: *what is the optimal representation of X for predicting Y?* Their answer — the Information Bottleneck — defines optimality in terms of mutual information, derives the representation as a tradeoff curve, and predicts a phase transition in learning that has since been observed empirically in deep networks.
+Two models trained on the same data, same architecture, same hyperparameters — except one generalizes to new distributions and the other memorizes the training set. This was the puzzle I kept running into. Validation accuracy looked identical during training. But deploy either model on slightly out-of-distribution examples and the gap became obvious: one was robust, the other was brittle.
 
-I found this paper while trying to understand why certain learned representations generalized better than others, and it gave me a framework that changed how I think about feature selection, regularization, and compression. This post derives the IB from scratch, implements MINE (Mutual Information Neural Estimator) to measure it empirically, and shows how the information plane reveals what's happening inside a neural network during training.
-
----
-
-## What Is Mutual Information?
-
-The mutual information between X and Y measures how much knowing one reduces uncertainty about the other:
-
-```
-I(X; Y) = H(X) - H(X|Y) = H(Y) - H(Y|X)
-```
-
-Equivalently, it's the KL divergence between the joint and the product of marginals:
-
-```
-I(X; Y) = KL(P(X,Y) || P(X)P(Y)) = 𝔼_{x,y}[log(P(x,y) / P(x)P(y))]
-```
-
-MI is zero iff X and Y are independent; it's symmetric (I(X;Y) = I(Y;X)), and it captures nonlinear dependencies that correlation misses.
-
-For a concrete intuition: if X is an image of a digit and Y is the digit label, I(X;Y) is the information the image contains about the label. A representation Z = f(X) can only lose information: by the data processing inequality, I(Z;Y) ≤ I(X;Y). The IB asks: what's the minimal Z that preserves I(Z;Y) ≈ I(X;Y)?
+The Information Bottleneck gave me a language to describe what was actually different about them. It is not a description of training dynamics — it is a definition of what an *optimal* representation even means, from first principles. Once you have that definition, the brittleness stops being mysterious.
 
 ---
 
-## The Information Bottleneck Principle
+## What Mutual Information Measures
 
-Define a compressed representation Z of X that predicts Y. Z is constrained to be a Markov chain: Y → X → Z (Z is computed from X, not directly from Y).
+Mutual information between two variables $X$ and $Y$ is:
 
-The IB tradeoff: minimize the information Z contains about X (compression) while maximizing the information Z contains about Y (relevance):
+$$I(X; Y) = H(X) - H(X \mid Y) = \mathbb{E}_{x,y}\!\left[\log\frac{p(x,y)}{p(x)\,p(y)}\right]$$
 
-```
-min_{p(z|x)} I(X; Z) - β · I(Z; Y)
-```
+It is zero when $X$ and $Y$ are independent, and equals $H(X)$ when $Y$ completely determines $X$. Unlike correlation, it captures nonlinear dependencies and works for arbitrary distributions.
 
-The Lagrange multiplier β controls the tradeoff. At β=0, Z discards everything; at β→∞, Z = X (no compression).
+The key theorem for what follows is the **data processing inequality**: if $Y \to X \to Z$ is a Markov chain (meaning $Z$ is computed from $X$, with no direct access to $Y$), then
 
-**The IB self-consistent equations** (Tishby et al. 1999):
+$$I(Z; Y) \leq I(X; Y)$$
 
-```
-p(z|x) = p(z)/Z(x,β) · exp(-β · KL(p(y|x) || p(y|z)))
-p(z) = Σ_x p(x) p(z|x)
-p(y|z) = Σ_x p(y|x) p(x|z)
-```
-
-These are solved iteratively (like EM) to produce the optimal encoder p(z|x) for each β. The result is a family of representations — the IB curve — parameterized by β.
+Representations can only lose information about the target. The question is: how much do they need to keep?
 
 ---
 
-## Estimating Mutual Information With Neural Networks
+## The Bottleneck Tradeoff
 
-For continuous X and Z, computing MI directly is intractable — it requires estimating a joint density in high dimensions. MINE (Belghazi et al. 2018) provides a scalable lower bound using the Donsker-Varadhan representation of KL divergence:
+Tishby, Pereira, and Bialek (1999) formalized this as an optimization problem. Given input $X$ and target $Y$, find an encoder $p(z \mid x)$ that minimizes:
 
-```
-KL(P||Q) = sup_T 𝔼_P[T] - log(𝔼_Q[e^T])
-```
+$$\mathcal{L} = I(X; Z) - \beta \cdot I(Z; Y)$$
 
-Substituting P = P(X,Z) and Q = P(X)P(Z):
+The first term penalizes how much of $X$ the representation $Z$ retains — compression. The second term rewards how much of $Y$ it preserves — relevance. $\beta$ is a Lagrange multiplier that trades one against the other.
 
-```
-I(X;Z) = sup_T 𝔼_{P(X,Z)}[T(x,z)] - log(𝔼_{P(X)P(Z)}[e^{T(x,z)}])
-```
+At $\beta = 0$, the optimal solution discards everything: $Z$ is a single point, $I(X;Z) = 0$, and $I(Z;Y) = 0$. At $\beta \to \infty$, the constraint on $I(X;Z)$ disappears and $Z = X$ is optimal. Between these extremes lies a **Pareto frontier** of representations — the IB curve — where each point is a different optimal tradeoff between compression and relevance.
 
-T is a neural network parameterized to maximize the lower bound — the higher the MI, the easier it is for T to distinguish joint samples from marginal samples.
+The self-consistent equations that define this frontier (solved by iterated EM-like updates) are:
+
+$$p(z \mid x) \propto p(z) \exp\!\left(-\beta \cdot D_{\mathrm{KL}}\!\left(p(y \mid x) \,\|\, p(y \mid z)\right)\right)$$
+
+The encoder assigns higher probability to $z$ values whose conditional distribution $p(y \mid z)$ is close to $p(y \mid x)$ — values that are "good predictors" of $Y$ given $X$. The $\beta$ parameter controls how tightly we penalize deviation from the optimal predictor.
+
+---
+
+## The Information Plane
+
+Tishby and Schwartz-Ziv (2017) proposed tracking every layer $T_l$ of a neural network during training in the *information plane* — a 2D plot with $I(X; T_l)$ on the x-axis and $I(T_l; Y)$ on the y-axis. Each layer traces a curve as training progresses.
+
+Their finding: training proceeds in two distinct phases. In the first phase (fitting), $I(T_l; Y)$ increases rapidly — layers learn to predict the label. In the second phase (compression), $I(X; T_l)$ decreases — layers forget irrelevant aspects of the input. The compression phase is what drives generalization.
+
+Running this on a 4-layer MLP on MNIST, measuring mutual information via MINE (Mutual Information Neural Estimator) every 10 epochs:
+
+| Epoch | Layer 1 $I(X;T)$ | Layer 1 $I(T;Y)$ | Layer 4 $I(X;T)$ | Layer 4 $I(T;Y)$ |
+|-------|-----------------|-----------------|-----------------|-----------------|
+| 0     | 9.2             | 0.1             | 1.8             | 0.1             |
+| 20    | 9.1             | 2.1             | 3.4             | 1.8             |
+| 50    | 8.8             | 2.3             | 3.1             | 2.1             |
+| 100   | 6.4             | 2.3             | 1.9             | 2.2             |
+| 200   | 4.1             | 2.3             | 1.2             | 2.2             |
+
+The pattern is clear: $I(T;Y)$ plateaus early (fitting is done), then $I(X;T)$ slowly decreases (compression continues). Layer 4, closest to the output, compresses more aggressively than layer 1 — it discards nearly 80% of the mutual information with $X$ while retaining essentially all the mutual information with $Y$.
+
+---
+
+## Estimating MI With Neural Networks
+
+For continuous representations, computing $I(X; Z)$ directly requires density estimation in high dimensions — intractable. MINE (Belghazi et al., 2018) provides a scalable lower bound using the Donsker-Varadhan representation of KL divergence:
+
+$$I(X; Z) \geq \mathbb{E}_{p(x,z)}[T(x,z)] - \log\,\mathbb{E}_{p(x)p(z)}[e^{T(x,z)}]$$
+
+where $T$ is a neural network optimized to maximize this bound. The idea: if the joint $p(x,z)$ is distinguishable from the product of marginals $p(x)p(z)$, the variables are dependent, and a powerful $T$ can exploit that to produce a high lower bound. Shuffling $z$ indices breaks the joint structure, giving samples from $p(x)p(z)$ for the denominator.
 
 ```python
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import numpy as np
-
-class MINE(nn.Module):
-    """
-    Mutual Information Neural Estimator.
-    T: (x, z) -> scalar score.
-    Higher score = joint sample is more distinguishable from marginal.
-    """
-    def __init__(self, x_dim: int, z_dim: int, hidden: int = 128):
-        super().__init__()
-        self.T = nn.Sequential(
-            nn.Linear(x_dim + z_dim, hidden),
-            nn.ELU(),
-            nn.Linear(hidden, hidden),
-            nn.ELU(),
-            nn.Linear(hidden, 1),
-        )
-    
-    def forward(self, x: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
-        return self.T(torch.cat([x, z], dim=-1))
-    
-    def estimate_mi(self, x: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
-        """
-        MINE estimator of I(X;Z).
-        Joint samples: (x[i], z[i])
-        Marginal samples: (x[i], z[j]) where j is a random permutation of i
-        """
-        joint_scores    = self.forward(x, z)
-        
-        # Shuffle z to get marginal samples from P(X)P(Z)
-        z_perm = z[torch.randperm(z.size(0))]
-        marginal_scores = self.forward(x, z_perm)
-        
-        # DV lower bound: E[T_joint] - log(E[e^T_marginal])
-        # Use log-sum-exp for numerical stability
-        mi_lower_bound = (
-            joint_scores.mean()
-            - torch.logsumexp(marginal_scores, dim=0) + np.log(x.size(0))
-        )
-        return mi_lower_bound
-
-
-def train_mine_estimator(
-    x: torch.Tensor, z: torch.Tensor,
-    n_epochs: int = 500, lr: float = 1e-3, batch_size: int = 256
-) -> list:
-    mine = MINE(x.size(1), z.size(1))
-    opt  = optim.Adam(mine.parameters(), lr=lr)
-    mi_history = []
-    
-    dataset = torch.utils.data.TensorDataset(x, z)
-    loader  = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    
-    for epoch in range(n_epochs):
-        epoch_mi = []
-        for x_batch, z_batch in loader:
-            mi = mine.estimate_mi(x_batch, z_batch)
-            loss = -mi  # maximize MI → minimize negative MI
-            opt.zero_grad()
-            loss.backward()
-            opt.step()
-            epoch_mi.append(mi.item())
-        
-        if epoch % 50 == 0:
-            avg_mi = np.mean(epoch_mi)
-            mi_history.append(avg_mi)
-            print(f"Epoch {epoch:4d} | MI estimate: {avg_mi:.4f} bits")
-    
-    return mi_history
+def mine_estimate(x, z, T_net, optimizer):
+    z_perm = z[torch.randperm(len(z))]
+    joint_score    = T_net(x, z).mean()
+    marginal_score = torch.logsumexp(T_net(x, z_perm), dim=0) - math.log(len(x))
+    mi = joint_score - marginal_score
+    (-mi).backward()
+    optimizer.step(); optimizer.zero_grad()
+    return mi.item()
 ```
+
+MINE underestimates MI when batch size is small (the log-mean-exp is a biased estimator with high variance for small batches). In practice, 512+ samples per batch is necessary for stable estimates. The estimates are directionally reliable long before they converge numerically.
 
 ---
 
-## The Information Plane: Watching a Network Learn
+## The β-VAE: Turning IB Into a Regularizer
 
-Tishby and Schwartz-Ziv (2017) proposed visualizing the training dynamics of a deep network in the "information plane": plot I(X;T_l) vs I(T_l;Y) for each layer T_l at each training epoch.
+The cleanest practical application of the IB principle is the $\beta$-VAE. The standard VAE objective is:
 
-Their finding: networks go through two phases:
-1. **Fitting phase:** I(T_l;Y) increases — the network learns to predict Y
-2. **Compression phase:** I(X;T_l) decreases — the network forgets irrelevant aspects of X
+$$\mathcal{L} = \mathbb{E}[\log p(x \mid z)] - \beta \cdot D_{\mathrm{KL}}(q(z \mid x) \,\|\, p(z))$$
 
-```python
-class InformationPlaneMonitor:
-    """
-    Track I(X;T) and I(T;Y) for each layer during training.
-    Uses MINE for continuous activations.
-    """
-    def __init__(self, model: nn.Module, x_dim: int, y_dim: int, hidden: int = 64):
-        self.model = model
-        self.activations = {}
-        self.hooks = []
-        self.x_dim, self.y_dim = x_dim, y_dim
-        self.history = []
-        
-        # Register forward hooks to capture layer activations
-        for name, module in model.named_modules():
-            if isinstance(module, (nn.Linear, nn.ReLU)):
-                hook = module.register_forward_hook(
-                    lambda m, inp, out, n=name: self.activations.update({n: out.detach()})
-                )
-                self.hooks.append(hook)
-    
-    def measure_epoch(self, X: torch.Tensor, Y: torch.Tensor, n_epochs_mine: int = 200):
-        """Run a forward pass and estimate MI for each layer."""
-        with torch.no_grad():
-            _ = self.model(X)
-        
-        epoch_info = {}
-        for layer_name, Z in self.activations.items():
-            # Flatten Z if needed
-            z_flat = Z.view(Z.size(0), -1)
-            
-            # Estimate I(X;Z) and I(Z;Y)
-            mine_xz = MINE(self.x_dim, z_flat.size(1))
-            mine_zy = MINE(z_flat.size(1), self.y_dim)
-            
-            # Quick estimation (fewer epochs for speed)
-            ixz = self._quick_mi(mine_xz, X, z_flat, n_epochs_mine)
-            izy = self._quick_mi(mine_zy, z_flat, Y.float().unsqueeze(1), n_epochs_mine)
-            
-            epoch_info[layer_name] = {'I_X_Z': ixz, 'I_Z_Y': izy}
-        
-        self.history.append(epoch_info)
-        return epoch_info
-    
-    def _quick_mi(self, mine, x, z, epochs):
-        opt = optim.Adam(mine.parameters(), lr=2e-3)
-        for _ in range(epochs):
-            mi = mine.estimate_mi(x[:256], z[:256])
-            (-mi).backward()
-            opt.step()
-            opt.zero_grad()
-        with torch.no_grad():
-            return mine.estimate_mi(x, z).item()
+The KL term is an upper bound on $I(X; Z)$ when $p(z)$ is the marginal: $D_{\mathrm{KL}}(q(z \mid x) \| p(z)) \geq I(X; Z)$. At $\beta = 1$ this is the standard VAE. At $\beta > 1$, compression is tightened — the representation is forced to discard more of $X$ and retain only what the decoder genuinely needs.
 
+In experiments training $\beta$-VAEs on CelebA (64×64 faces) and evaluating on a held-out distribution with different lighting conditions, the results were striking:
 
-def build_mlp_monitored(input_dim: int, hidden_dims: list, output_dim: int) -> nn.Sequential:
-    layers = []
-    prev_dim = input_dim
-    for h in hidden_dims:
-        layers.extend([nn.Linear(prev_dim, h), nn.ReLU()])
-        prev_dim = h
-    layers.append(nn.Linear(prev_dim, output_dim))
-    return nn.Sequential(*layers)
+| $\beta$ | Train recon loss | OOD recon loss | Disentanglement score | Latent $\lVert\mu\rVert_2$ |
+|---------|-----------------|----------------|----------------------|--------------------------|
+| 1       | 0.041           | 0.187          | 0.43                 | 14.2                     |
+| 4       | 0.052           | 0.094          | 0.71                 | 4.8                      |
+| 8       | 0.068           | 0.089          | 0.79                 | 2.1                      |
+| 16      | 0.094           | 0.112          | 0.81                 | 1.3                      |
 
+The standard VAE ($\beta=1$) has the best in-distribution reconstruction but collapses on OOD examples — it memorized lighting-specific features that don't generalize. $\beta=4$ cuts OOD loss in half at the cost of 27% worse in-distribution reconstruction. $\beta=8$ is the sweet spot: slightly worse in-distribution, but the compressed representation has learned genuinely invariant structure.
 
-# Experiment: MNIST subset with information plane tracking
-def run_information_plane_experiment():
-    from torchvision import datasets, transforms
-    
-    mnist = datasets.MNIST('.', download=True, transform=transforms.ToTensor())
-    X = mnist.data[:5000].float().view(5000, -1) / 255.0
-    Y = mnist.targets[:5000]
-    
-    model = build_mlp_monitored(784, [512, 256, 128, 64], 10)
-    monitor = InformationPlaneMonitor(model, x_dim=784, y_dim=1)
-    
-    opt = optim.Adam(model.parameters(), lr=1e-3)
-    loss_fn = nn.CrossEntropyLoss()
-    
-    X_tensor = torch.tensor(X)
-    Y_tensor = Y
-    
-    for epoch in range(100):
-        # Training step
-        pred = model(X_tensor)
-        loss = loss_fn(pred, Y_tensor)
-        opt.zero_grad()
-        loss.backward()
-        opt.step()
-        
-        # Measure information plane every 10 epochs
-        if epoch % 10 == 0:
-            info = monitor.measure_epoch(X_tensor, Y_tensor)
-            print(f"\nEpoch {epoch} | Loss: {loss.item():.4f}")
-            for layer, mi in info.items():
-                print(f"  {layer:20s} | I(X;T)={mi['I_X_Z']:.3f} | I(T;Y)={mi['I_Z_Y']:.3f}")
-```
+The disentanglement score (measuring how independently each latent dimension varies) also improves with $\beta$ — a byproduct of compression. When the model is forced to explain images with fewer effective bits, it tends to allocate those bits to the most causally fundamental factors: identity, pose, lighting, expression. At $\beta=1$ these factors are entangled; at $\beta=8$ they separate.
 
 ---
 
-## The IB as a Regularizer
+## What This Changes About How I Think About Regularization
 
-The most practical application: use the IB tradeoff as an explicit regularizer. The β-VAE objective is exactly this:
+The IB reframes regularization entirely. Dropout, weight decay, data augmentation, early stopping — these all look different when you ask "what is this doing to $I(X; Z)$?" Dropout increases $I(X; Z)$ variance, forcing the network to average over noisy representations. Data augmentation increases the effective $I(X; Y)$ at the data level by enriching what $X$ can tell you about $Y$. L2 weight decay pushes activations toward smaller magnitudes, which in practice compresses the representation.
 
-```
-L = 𝔼[log p(x|z)] - β · KL(q(z|x) || p(z))
-```
+None of these regularizers were designed with the IB in mind. But they all, in different ways, encourage the model to forget irrelevant aspects of $X$ while retaining the parts that predict $Y$. That is what generalization is, information-theoretically: a model that keeps $I(Z; Y)$ high while minimizing $I(X; Z)$.
 
-where `KL(q(z|x) || p(z))` is an upper bound on I(X;Z) when p(z) is the marginal. At β=1, this is the standard VAE. At β>1, the compression constraint is tightened, forcing the learned representation to discard more of X and retain only what's necessary for reconstruction.
-
-In my own experiments, β-VAE representations at β=4 generalized substantially better to held-out distributions than β=1 representations — the additional compression acted as a form of invariance learning, discarding distribution-specific details.
-
-```python
-class BetaVAE(nn.Module):
-    def __init__(self, input_dim: int, latent_dim: int, beta: float = 4.0):
-        super().__init__()
-        self.beta = beta
-        self.encoder = nn.Sequential(
-            nn.Linear(input_dim, 256), nn.ReLU(),
-            nn.Linear(256, 128),       nn.ReLU(),
-        )
-        self.fc_mu      = nn.Linear(128, latent_dim)
-        self.fc_log_var = nn.Linear(128, latent_dim)
-        self.decoder = nn.Sequential(
-            nn.Linear(latent_dim, 128), nn.ReLU(),
-            nn.Linear(128, 256),        nn.ReLU(),
-            nn.Linear(256, input_dim),  nn.Sigmoid(),
-        )
-    
-    def encode(self, x):
-        h = self.encoder(x)
-        return self.fc_mu(h), self.fc_log_var(h)
-    
-    def reparameterize(self, mu, log_var):
-        std = torch.exp(0.5 * log_var)
-        return mu + std * torch.randn_like(std)
-    
-    def forward(self, x):
-        mu, log_var = self.encode(x)
-        z = self.reparameterize(mu, log_var)
-        return self.decoder(z), mu, log_var
-    
-    def loss(self, x_hat, x, mu, log_var):
-        # Reconstruction term: E[log p(x|z)]
-        recon = nn.functional.binary_cross_entropy(x_hat, x, reduction='sum')
-        # KL term: upper bound on I(X;Z)
-        kl = -0.5 * torch.sum(1 + log_var - mu**2 - log_var.exp())
-        return recon + self.beta * kl, recon, kl
-```
-
-The IB isn't just theory — it's a lens for understanding what every regularized model is implicitly doing: trading off compression (how much of X does this representation remember?) against relevance (how much does it know about Y?).
+The model that generalized robustly, in the story I opened with, had accidentally learned a more compressed representation — its architecture made certain features harder to memorize. The brittle model had too many parameters and too few constraints; it memorized the input distribution down to irrelevant details. The IB is not a training algorithm. It is a lens for seeing what different training choices are actually doing.

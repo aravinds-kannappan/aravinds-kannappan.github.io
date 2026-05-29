@@ -10,206 +10,120 @@ tags:
   - mathematics
 ---
 
-There is a line of thought in AI alignment that begins with a deceptively simple question: what does it mean to learn? Not to perform well on a benchmark, not to minimize a loss, but to genuinely induce the correct hypothesis from data. The mathematical answer to this question, developed across three decades of work in algorithmic information theory, is **Solomonoff induction** — a theoretically optimal Bayesian learner grounded in Kolmogorov complexity. And when you examine its foundations carefully, it reveals something troubling about the possibility of value learning: the most powerful possible learner, given all possible data, cannot in principle recover the objective function of its designer without additional structure that cannot itself be learned.
+Begin with the simplest possible question about intelligence: what does it mean to learn? Not to fit a curve, not to minimize a loss, but to genuinely induce the right explanation from evidence. This question has a precise mathematical answer — one that was worked out in the 1960s by Kolmogorov, Solomonoff, and Chaitin, and extended by Hutter in the 2000s into a formal theory of optimal rational agency. The answer is beautiful and the theory is complete. It is also, on close inspection, deeply troubling for the project of value alignment.
 
-This post develops the mathematical foundations of algorithmic information theory, traces through the construction of Solomonoff induction and its descendant AIXI, and then examines what these formalisms imply for the hardest questions in AI alignment.
+The argument runs as follows. The correct universal theory of learning is Solomonoff induction, which achieves the best possible predictions on any computable data source. The correct theory of optimal decision-making is AIXI, which achieves the best possible rewards in any computable environment. Both are provably optimal, in a formal sense. Neither is alignable in the general case, for reasons that follow from Gödel's incompleteness theorem. This is not a practical difficulty about current systems — it is a mathematical theorem about the limits of what aligned general intelligence can be.
 
 ---
 
 ## Kolmogorov Complexity: The Length of Understanding
 
-Let $$U$$ be a fixed universal Turing machine — a Turing machine that can simulate any other Turing machine when given an appropriate program. The **Kolmogorov complexity** of a binary string $$x \in \{0,1\}^*$$ is:
+The story starts with a question about strings. Given a finite binary string $x$, what is the shortest possible description of $x$? Fix a universal Turing machine $U$. The **Kolmogorov complexity** of $x$ is
 
-$$K(x) = \min_{p : U(p) = x} |p|$$
+$$K(x) = \min_{p \,:\, U(p) = x} \lvert p \rvert$$
 
-the length of the shortest program that causes $$U$$ to output $$x$$ and halt. It is the length of the most compressed description of $$x$$. A string is **incompressible** (random, in Kolmogorov's sense) if $$K(x) \approx |x|$$ — no program shorter than $$x$$ itself can generate it. A string is **compressible** (structured, regular) if $$K(x) \ll |x|$$ — it has a short description.
+the length of the shortest program that causes $U$ to output $x$ and halt. A string with $K(x) \approx \lvert x \rvert$ is incompressible — no description shorter than the string itself can generate it. Such strings are, in the precise technical sense, *random*: they have no structure that a program could exploit to produce them concisely. A string with $K(x) \ll \lvert x \rvert$ is structured — it has a short explanation.
 
-Kolmogorov complexity is not computable: the function $$x \mapsto K(x)$$ is not Turing-computable. The reason is a diagonalization argument. Suppose there were a program $$P$$ that computed $$K(x)$$ for all $$x$$. Consider the string $$x_n$$ defined as the first string of complexity greater than $$n$$. $$P$$ would find $$x_n$$ in time depending only on $$n$$, and a program that calls $$P$$ and extracts $$x_n$$ would have length $$O(\log n)$$ — much shorter than $$n$$, contradicting $$K(x_n) > n$$. This is Kolmogorov's version of Berry's paradox: "the smallest integer not definable in fewer than thirteen words" is itself defined in twelve words.
+Two properties of $K$ are immediate and important. First, it is machine-independent up to a constant: for any two universal Turing machines $U$ and $U'$, $\lvert K_U(x) - K_{U'}(x) \rvert \leq c_{U,U'}$ for a constant depending only on the machines. This means $K$ is not an artifact of a particular computational model — it is a property of $x$ itself.
 
-Despite being uncomputable, Kolmogorov complexity is well-defined and satisfies fundamental inequalities. The most important is the **chain rule**:
+Second, it is **not computable**. The proof is a diagonalization. Suppose a program $P$ computed $K(x)$ for all $x$. Consider the string $x_n$ defined as the first string of complexity greater than $n$. A program that calls $P$ and extracts $x_n$ has length $O(\log n)$, far shorter than $n$, contradicting $K(x_n) > n$. This is Berry's paradox — "the smallest integer not definable in fewer than thirteen words" — made precise. Kolmogorov complexity is well-defined, well-behaved, and forever out of reach of any algorithm.
 
-$$K(x, y) = K(x) + K(y | x) + O(\log K(x, y))$$
+The **chain rule** makes $K$ compositional:
 
-The complexity of the pair $$(x, y)$$ is the complexity of $$x$$ plus the complexity of $$y$$ given $$x$$, up to logarithmic terms. This is the algorithmic analog of the entropy chain rule $$H(X, Y) = H(X) + H(Y | X)$$.
+$$K(x, y) = K(x) + K(y \mid x) + O(\log K(x, y))$$
 
-The **conditional Kolmogorov complexity** $$K(y | x)$$ is:
-
-$$K(y | x) = \min_{p: U(p, x) = y} |p|$$
-
-the length of the shortest program that outputs $$y$$ given $$x$$ as an auxiliary input. The mutual information:
-
-$$I(x : y) = K(x) + K(y) - K(x, y) = K(x) - K(x | y^*)$$
-
-where $$y^*$$ is the shortest program for $$y$$, measures the shared algorithmic information between $$x$$ and $$y$$.
+where $K(y \mid x) = \min_{p \,:\, U(p,x)=y} \lvert p \rvert$ is the conditional complexity. The mutual information $I(x : y) = K(x) + K(y) - K(x,y)$ measures shared algorithmic content. These are the algorithmic analogs of entropy chain rules, but they hold for individual strings rather than distributions.
 
 ---
 
-## Solomonoff's Universal Prior
+## The Universal Prior
 
-In Bayesian inference, the prior $$P(h)$$ over hypotheses encodes beliefs before observing data. Solomonoff's insight was that the correct universal prior should assign probability proportional to $$2^{-K(h)}$$ — simpler hypotheses (shorter programs) should be more probable a priori. This is **Occam's razor made quantitative and universal**.
+Solomonoff's insight was to turn Kolmogorov complexity into a probability distribution. The **Solomonoff prior** is
 
-The **Solomonoff prior** over binary strings is defined via a universal monotone Turing machine $$U_M$$ (one that outputs an infinite sequence given an infinite program tape):
+$$M(x) = \sum_{p \,:\, U_M(p) \text{ outputs prefix } x} 2^{-\lvert p \rvert}$$
 
-$$M(x) = \sum_{p: U_M(p) \text{ starts with } x} 2^{-|p|}$$
+the probability that a random program (each bit independently fair-coin) causes the universal monotone machine $U_M$ to output a string beginning with $x$. It is a semimeasure: $\sum_b M(xb) \leq M(x)$, with equality failing when some programs that output $x$ never produce a continuation. The failure is probability mass "lost" to non-halting programs — a direct manifestation of the halting problem.
 
-This is a **semimeasure** — it satisfies $$\sum_b M(xb) \leq M(x)$$ rather than equality, because some programs never halt. It is not a proper probability measure, but it is **enumerable from below** (the sum of contributions from each program can be approximated arbitrarily well from below).
+The prior $M$ satisfies a **universality property**: for any computable probability measure $\mu$ over strings, there exists a constant $c_\mu = 2^{-K(\mu)}$ such that $M(x_{1:n}) \geq c_\mu \cdot \mu(x_{1:n})$ for all strings. The Solomonoff prior dominates every computable measure. It weights hypotheses by $2^{-K(h)}$ — simpler explanations get exponentially more prior probability — and no computable forecaster can persistently outpredict it.
 
-The Solomonoff prior satisfies the **universality property**: for any computable probability measure $$\mu$$ over strings, there exists a constant $$c_\mu$ (depending only on $$\mu$$, not on the data) such that:
+**Solomonoff induction** uses $M$ as a Bayesian prior and predicts
 
-$$M(x_{1:n}) \geq c_\mu \cdot \mu(x_{1:n}) \quad \forall x_{1:n} \in \{0,1\}^n$$
+$$P(x_{n+1} = 1 \mid x_{1:n}) = \frac{M(x_{1:n}1)}{M(x_{1:n}1) + M(x_{1:n}0)}$$
 
-The Solomonoff prior **dominates** every computable measure. A Bayesian who uses $$M$$ as their prior can never be persistently outpredicted by any computable forecaster — any computable learner's advantage over $$M$$ is bounded by the constant $$c_\mu = 2^{-K(\mu)}$$.
+The convergence theorem is the core result: for any computable data-generating process $\mu$ and any $\epsilon > 0$,
 
-**Solomonoff induction** predicts the next bit $$x_{n+1}$$ given $$x_{1:n}$$ by:
+$$\sum_{n=1}^\infty \mathbb{E}_\mu\!\left[\!\left(P(x_{n+1}=1 \mid x_{1:n}) - \mu(x_{n+1}=1 \mid x_{1:n})\right)^2\right] \leq \ln(1/c_\mu) < \infty$$
 
-$$P(x_{n+1} = 1 | x_{1:n}) = \frac{M(x_{1:n}1)}{M(x_{1:n}1) + M(x_{1:n}0)}$$
-
-It weights all computable hypotheses by their prior probability and posterior evidence. The **convergence theorem** states that for any computable data-generating process $$\mu$$ and any $$\epsilon > 0$$:
-
-$$\sum_{n=1}^\infty \mathbb{E}_\mu\left[\left(P(x_{n+1} = 1 | x_{1:n}) - \mu(x_{n+1} = 1 | x_{1:n})\right)^2\right] \leq \ln(1/c_\mu) < \infty$$
-
-The total squared prediction error is finite — Solomonoff induction eventually predicts as well as the true process, for any computable true process, with finitely many mistakes in expectation. This is a remarkable result: a single learner that works for all computable environments simultaneously.
+The total squared prediction error is bounded by $K(\mu)\ln 2$ — finite, and independent of $n$. Solomonoff induction eventually predicts as well as the true process, with finitely many mistakes, for *any* computable true process simultaneously. This is the optimal learner: it cannot be consistently outperformed by any computable forecast, on any computable data source.
 
 ---
 
-## AIXI: The Optimal Agent
+## AIXI: Optimal Agency
 
-Hutter's **AIXI** extends Solomonoff induction from passive prediction to active decision-making. An agent in environment $$\mu$$ receives observations $$o_t \in \mathcal{O}$$, takes actions $$a_t \in \mathcal{A}$$, and receives rewards $$r_t \in [0, 1]$$ at each timestep. The agent's goal is to maximize the expected sum of future rewards.
+Hutter's AIXI extends Solomonoff induction from passive prediction to active decision-making. The agent receives observation-reward pairs $(o_t, r_t)$ and takes actions $a_t$ at each step. It aims to maximize discounted future reward.
 
-The AIXI agent acts to maximize:
+AIXI acts according to:
 
-$$\text{AIXI} = \arg\max_{a_t} \sum_{o_t r_t} \cdots \max_{a_{t+m}} \sum_{o_{t+m} r_{t+m}} \left[\sum_{k=t}^{t+m} r_k\right] \sum_{\rho: U(\rho, a_{<t} o_{<t} a_t) = o_t r_t \cdots} 2^{-|\rho|}$$
+$$a_t = \arg\max_{a_t} \sum_{o_t r_t} \max_{a_{t+1}} \cdots \sum_{o_{t+m} r_{t+m}} \left[\sum_{k=t}^{t+m} r_k\right] \sum_{\rho \,:\, U(\rho,\, a_{<t}o_{<t}a_t)=o_tr_t\cdots} 2^{-\lvert\rho\rvert}$$
 
-This is the optimal action under a universal prior over environments: at each step, AIXI considers all computable environments weighted by the Solomonoff prior, conditions on all past interactions, and takes the action that maximizes expected future reward in this mixture.
+This expression is, in effect, expected future reward under the Solomonoff mixture over all computable environments, taking the action that maximizes it at each step. The Solomonoff prior weights environments by their complexity — simpler environments (shorter programs) get more prior weight — and AIXI integrates over all of them.
 
-AIXI is **Pareto-optimal**: for any computable agent $$\pi$ and any computable environment, AIXI achieves at least as much reward as $$\pi$$ in the limit, up to a constant depending on the complexity of the environment. No computable agent can systematically outperform AIXI.
+AIXI is Pareto-optimal: for any computable agent $\pi$ and any computable environment, AIXI earns at least as much cumulative reward as $\pi$ in the limit, up to a constant factor. This is a formal sense in which AIXI is the best possible agent. The formal value function is:
 
-The formal statement requires the **AIXItl** approximation (AIXI truncated to programs of length $$\leq l$$ and interactions $$\leq t$$), since AIXI itself is uncomputable. The value function of AIXI is:
+$$V^{\text{AIXI}}_m(h) = \max_a \sum_{oe} \!\left[r + V^{\text{AIXI}}_{m-1}(hae)\right] \xi(e \mid ha)$$
 
-$$V^{AIXI}_m(h) = \max_a \sum_{oe} \left[r + V^{AIXI}_{m-1}(hae)\right] \xi(e | ha)$$
+where $h$ is the history, $e = or$ is the next observation-reward pair, and $\xi(e \mid h)$ is the Solomonoff mixture over programs. The recursion is clean. The agent is, in a rigorous mathematical sense, optimal.
 
-where $$h$$ is the interaction history, $$e = or$$ is the perception-reward pair, and $$\xi(e | h) = \sum_\rho 2^{-|\rho|} [\text{env }\rho \text{ predicts } e \text{ after } h]$$ is the Solomonoff mixture over environments.
+It is also, in every practical sense, unimplementable. AIXI requires computing over all Turing programs, which requires solving the halting problem. The approximation AIXItl (truncated to programs of length $\leq l$ and planning horizon $\leq t$) is computable but exponential in both $l$ and $t$.
 
 ---
 
 ## The Reward Identification Problem
 
-Here the alignment problem enters in its sharpest form. AIXI maximizes the reward signal it receives. But AIXI does not know what the reward signal is supposed to represent. The reward $$r_t$$ is just a number in $$[0, 1]$$, generated by the environment. AIXI treats it as a scalar to maximize, with no interpretation.
+Here is where alignment enters, in its sharpest form. AIXI maximizes the reward signal $r_t \in [0,1]$ it receives from the environment. But AIXI does not know what the reward signal *represents*. It is a number to be maximized, not a proxy for human values. The question is: can an agent learn the intended reward function from behavioral data?
 
-The **reward identification problem** asks: given a data stream $$\{(o_t, a_t, r_t)\}_{t=1}^n$$, can an agent recover the true reward function $$R^*: \mathcal{S} \times \mathcal{A} \to \mathbb{R}$$ intended by its designer?
+The answer is no in general, and the proof is information-theoretic. Consider two reward functions $R_1$ and $R_2$ that agree on all state-action pairs the agent has visited:
 
-The answer, in general, is **no**, and the proof is information-theoretic. Consider two reward functions $$R_1$$ and $$R_2$$ that agree on all state-action pairs reachable under any policy the agent has executed so far:
+$$R_1(s,a) = R_2(s,a) \quad \forall (s,a) \in \{(s_t, a_t)\}_{t \leq n}$$
 
-$$R_1(s, a) = R_2(s, a) \quad \forall (s, a) \in \{(s_t, a_t)\}_{t \leq n}$$
+No data distinguishes them. Any learner — Bayesian, frequentist, algorithmic — that has only observed the trajectory $\{(s_t, a_t, r_t)\}$ must assign equal posterior to $R_1$ and $R_2$. If $R_1$ and $R_2$ differ on some unvisited state $s^*$, the agent's behavior at $s^*$ will follow whichever $R$ the prior prefers — and the Solomonoff prior prefers the *simpler* reward function, which need not be the intended one.
 
-No amount of past data distinguishes $$R_1$$ from $$R_2$$. Any learner — Bayesian, frequentist, or algorithmic — that has only observed the trajectory $$\{(s_t, a_t, r_t)\}$$ must assign equal posterior to $$R_1$$ and $$R_2$$, since they make identical predictions on all observed data.
-
-Now if $$R_1$$ and $$R_2$$ differ on some unvisited state $$s^*$$, the agent faces a genuine ambiguity. It cannot know whether exploring toward $$s^*$$ will yield high reward (under $$R_1$$) or low reward (under $$R_2$$). The Solomonoff prior provides a tie-breaker — prefer the simpler reward function — but the simplest reward function consistent with all observations may not be the intended one.
-
-Formally: let $$\mathcal{R}_n = \{R : R(s_t, a_t) = r_t \; \forall t \leq n\}$$ be the set of reward functions consistent with observed data. The Kolmogorov complexity of the set $$\mathcal{R}_n$$ is:
-
-$$K(\mathcal{R}_n) = K(r_{1:n}, s_{1:n}, a_{1:n}) + O(\log n)$$
-
-The Solomonoff posterior over $$\mathcal{R}_n$$ concentrates on the minimum-complexity elements. The true reward function $$R^*$$ is minimum-complexity only if the designer's intentions happen to be the simplest explanation of the observed data. There is no guarantee of this.
+We can state this precisely. The reward identification problem is to recover $R^*$ from trajectory data. Call $R^*$ **learnable** by agent $\pi$ if the agent's estimate converges to $R^*$ on all reachable states. The **diagonalization argument** shows that no computable agent can learn every computable reward function: define $R_\pi$ to give reward $0$ whenever $\pi$ takes the action it currently estimates as optimal, and reward $1$ otherwise. $R_\pi$ is computable (since $\pi$ is), so $\pi$ should eventually learn it. But learning $R_\pi$ requires always taking the non-optimal action, which changes what $R_\pi$ rewards — and the loop never converges. The set of learnable reward functions for any computable agent has measure zero in the space of all computable functions.
 
 ---
 
-## Solomonoff's Incompleteness Theorem for Value Learning
+## The Löbian Obstacle
 
-We can state a precise theorem. Call a reward function $$R^*$$ **learnable** by an agent $$\pi$$ if, for all $$\epsilon > 0$$, there exists $$n_0$$ such that for all $$n \geq n_0$$:
+Even if we assume the reward function is given correctly, a second problem arises: can the agent trust its own reasoning about whether it is doing the right thing?
 
-$$\mathbb{E}\left[|R^*_n(\pi) - R^{(n)}(\pi)|\right] < \epsilon$$
+Gödel's second incompleteness theorem establishes that no consistent formal system $T$ of sufficient strength can prove its own consistency: $T \nvdash \text{Con}(T)$. **Löb's theorem** deepens this: for any formula $\phi$, if $T \vdash \Box_T\phi \to \phi$ (where $\Box_T\phi$ means "$T$ proves $\phi$"), then $T \vdash \phi$. Contrapositively: $T$ cannot prove $\Box_T\phi \to \phi$ for any $\phi$ that is not already provable.
 
-where $$R^*_n(\pi)$$ is the true expected return under $$R^*$$ and $$R^{(n)}(\pi)$$ is the agent's estimated expected return after $$n$$ interactions.
+Applied to a proof-based AI agent: suppose the agent takes action $a$ only when it can prove $V(a) \geq V(a')$ for all alternatives. By Löb's theorem, the agent can prove that its proven conclusions are correct only if those conclusions are already provable without the self-trust assumption — the self-referential justification is circular. An agent that needs to verify its own reasoning in order to act cannot do so without already having what it's trying to verify.
 
-**Theorem (informal):** No agent that operates in a universal class of environments can learn every computable reward function from behavioral data alone.
-
-The proof is a diagonalization. Suppose agent $$\pi$$ learns every computable reward function. Define a reward function $$R_\pi$$ that returns reward $$0$$ whenever $$\pi$$ would have taken the action that maximizes its current estimate of $$R^*$$, and reward $$1$$ otherwise. $$R_\pi$$ is computable (since $$\pi$$ is computable), and by assumption $$\pi$$ eventually learns it. But learning $$R_\pi$$ requires eventually always taking the non-maximizing action — at which point $$R_\pi$$ changes to give reward to the maximizing action again — and so on, ad infinitum. The agent cannot converge. $$\blacksquare$$
-
-This is an algorithmic information-theoretic analog of the halting problem applied to value learning. Any computable value learner can be tricked by a computable adversarial reward function. The set of learnable reward functions for any computable agent has measure zero in the space of all computable functions.
+The practical consequence is that any sufficiently powerful agent modeled as a proof system cannot take actions whose justification requires trusting its own reliability as a reasoner. It can act on external evidence and pre-committed priors, but it cannot act on "I have proven this is right" without incurring a logical contradiction or running in a circle. This is not a matter of needing more compute or a better architecture. It is a structural property of formal systems strong enough to reason about themselves.
 
 ---
 
-## Logical Uncertainty and the Limits of Priors
+## Levin's Kt Complexity and the Tractability Gap
 
-The Solomonoff prior requires an agent to reason about the outputs of all Turing machines — including arbitrarily complex ones whose halting behavior is undecidable. In practice, agents have bounded computational resources and cannot compute $$M(x)$$ exactly.
+Return to the question of value learning. Kolmogorov complexity $K$ measures description length. **Levin's Kt complexity** additionally penalizes computation time:
 
-**Logical uncertainty** is the uncertainty an agent must maintain about the outputs of computations it has not yet performed. A bounded agent cannot know whether a program of length $$n$$ will halt, what it will output if it does, or even whether a given mathematical statement is provable in a given formal system.
+$$Kt(x) = \min_{p \,:\, U(p)=x} \!\left[\lvert p \rvert + \log \text{time}(p)\right]$$
 
-Gaifman's **logical prior** attempts to extend Bayesian reasoning to mathematical statements. Let $$\mathcal{L}$$ be a first-order language and $$\phi \in \mathcal{L}$$ a sentence. A **coherent credence function** $$P: \mathcal{L} \to [0,1]$$ assigns probabilities to sentences and satisfies:
+A description that is short but slow gets a higher Kt than one that is short and fast. The universal search algorithm finds the shortest efficient program in time $O(Kt(x) \cdot t(p^*))$ — roughly optimal in terms of description length times computation time.
 
-1. $$P(\top) = 1$$, $$P(\bot) = 0$$
-2. $$P(\phi \lor \psi) = P(\phi) + P(\psi)$$ when $$\phi, \psi$$ are contradictory
-3. $$P(\phi) = P(\psi)$$ when $$\phi \leftrightarrow \psi$$ is provable
+For alignment, the distinction between $K$ and $Kt$ is crucial. Human values, as a description, may have low Kolmogorov complexity — something like "what a fully informed, reflectively coherent human would prefer" is a short specification. But evaluating this description on any particular action requires simulating full human deliberation, which involves arbitrary chains of counterfactual reasoning, emotional inference, long-term consequence estimation, and social judgment. The Kt complexity of human values is enormous.
 
-Gaifman's theorem: there exists a coherent prior $$P^*$$ over $$\mathcal{L}$$ such that for any computable sequence of sentences $$\phi_1, \phi_2, \ldots$$ whose truth values are independently and identically distributed, $$P^*$$ achieves convergence analogous to Solomonoff induction.
+A Solomonoff-based learner that minimizes $K$ will converge toward something close to the correct specification of human values. A resource-bounded learner that minimizes $Kt$ will converge toward the most tractable proxy — the function that is both short to describe and fast to evaluate. These are not the same function. The learner that is optimal under computational constraints will systematically prefer tractable proxies over the genuine objective, not because it is malicious but because the problem it is solving is Kt minimization, and the gap between $K(V_H)$ and $Kt(V_H)$ is the gap between the specified values and the computable approximation.
 
-But the Gaifman prior inherits the computability barrier: $$P^*$$ is not computable. Any computable approximation must truncate the space of hypotheses, and the truncated prior introduces bias. The bias is bounded by $$2^{-K(\text{true hypothesis})}$$ — the Kolmogorov complexity of the correct description of the world, which for complex value functions is large.
-
-The **Löbian obstacle** compounds this. Gödel's second incompleteness theorem implies that a sufficiently powerful formal system cannot prove its own consistency. For an AI agent modeled as a proof system $$T$$, any action that requires the agent to trust its own predictions requires $$T$$ to prove a statement of the form "if $$T$$ is consistent, then action $$a$$ leads to outcome $$o$$." But if $$T$$ cannot prove its own consistency (as Löb's theorem implies for sufficiently strong $$T$$), the agent cannot take actions whose justification requires its own reliability.
-
-Formally, Löb's theorem states: for any formula $$\phi$$, if $$T \vdash \Box_T \phi \to \phi$$ (where $$\Box_T \phi$$ means "$$T$$ proves $$\phi$$"), then $$T \vdash \phi$$. Contrapositively: if $$\phi$$ is not provable in $$T$$, then $$T \vdash \Box_T \phi \to \phi$$ is also not provable. An agent cannot use its own provability as evidence for a conclusion's truth, because provability and truth are not identified in any consistent system strong enough to be interesting.
-
-This applies directly to value learning: an agent cannot, in general, prove that its learned value function accurately reflects the intended values, because doing so would require the agent to verify a correspondence between its internal representation and an external standard, and Gödelian incompleteness limits such self-referential verification.
+This is the algorithmic information-theoretic account of inner alignment failure: the discrepancy between the training objective (minimize some computable loss) and the intended behavior (evaluate genuine human preferences) is exactly the gap between $K$ and $Kt$ complexity of the value function.
 
 ---
 
-## Levin's Kt Complexity and Computational Alignment
+## What Follows
 
-Kolmogorov complexity measures description length; **Levin's Kt complexity** additionally penalizes computational time:
+These results — the undecidability of value learning, the Löbian obstacle to self-verification, and the Kt-complexity tractability gap — are not arguments that aligned AI is impossible. They are arguments about what kind of problem it is.
 
-$$Kt(x) = \min_{p: U(p) = x} \left[|p| + \log(\text{time}(p))\right]$$
+An aligned AI system cannot, in general, learn the correct value function from behavioral data alone. It requires additional structure: a value specification that is grounded externally (in human oversight) rather than derived internally (from reward signal optimization). An aligned AI system cannot, in general, verify its own alignment: it requires external certification from a formal system stronger than itself. And an aligned AI system cannot, in general, evaluate the true human value function: it requires approximations whose fidelity must be monitored and corrected over time.
 
-where $$\text{time}(p)$$ is the number of steps $$U$$ takes running $$p$$. Kt complexity is also not computable but has better approximation properties: the **Levin search** (or **universal search**) algorithm finds the shortest efficient program for $$x$$ in time $$O(Kt(x) \cdot t(p^*))$$ where $$p^*$$ is the optimal program.
-
-The alignment relevance: value functions that are simple to describe but computationally expensive to evaluate (high Kt) are effectively inaccessible to bounded agents. An agent that uses Solomonoff's prior rather than Levin's prior will overweight computationally cheap hypotheses — it will prefer reward functions that are both short and fast to evaluate. True human values, which involve complex counterfactual reasoning, emotional states, long-term consequences, and contextual sensitivity, may be simple in Kolmogorov complexity (describable as "what a reflectively coherent human would endorse") but expensive in Kt complexity (requiring extensive computation to evaluate).
-
-This creates a systematic bias in Solomonoff-based learners toward reward functions that are computationally tractable proxies for the true objective. The Kolmogorov complexity of "maximize long-term human flourishing" may be small, but the Kt complexity is astronomical. The learner will, optimally and provably, prefer proxies.
-
----
-
-## Reflective Stability and Fixed Points
-
-A well-aligned agent should be **reflectively stable**: it should not take actions that would modify its own value function in ways that change its future behavior, because doing so would be equivalent to unilaterally revising the objectives its designers intended.
-
-The formalization uses **fixed-point theorems** from mathematical logic. Consider an agent $$\mathcal{A}$$ with value function $$V$$ and the ability to modify itself into agent $$\mathcal{A}'$$ with value function $$V'$$. The agent is reflectively stable if:
-
-$$\mathcal{A} \text{ does not modify to } \mathcal{A}' \text{ unless } V(\mathcal{A}') \geq V(\mathcal{A})$$
-
-where the comparison is under $$V$$, not $$V'$$. The question is whether stable fixed points — agents that don't want to modify themselves — exist and are attractive.
-
-The **Kakutani fixed-point theorem** guarantees: for any compact convex set $$X$$ and upper-hemicontinuous correspondence $$F: X \rightrightarrows X$$, there exists $$x^* \in F(x^*)$$. If we let $$X$$ be the space of value functions and $$F(V)$$ be the set of value functions that $$V$$-agents prefer to self-modify toward, fixed points are guaranteed to exist under mild conditions. But:
-
-1. Fixed points may not be unique
-2. The fixed points may not coincide with the intended values
-3. The dynamics of self-modification may not converge to any fixed point
-
-**Löbian reflection** provides the clearest obstruction. Suppose agent $$\mathcal{A}$$ uses proof-based decision theory: it takes action $$a$$ if it can prove $$V(a) > V(a')$$ for all alternatives $$a'$$. By Löb's theorem, $$\mathcal{A}$$ can only trust its own proofs under the condition that its reasoning system is consistent — which it cannot itself prove. An agent that tries to verify that self-modification preserves its values must rely on its own reasoning, which is exactly what it is trying to verify. The circularity is not resolvable within the formal system.
-
----
-
-## The Complexity of Human Values
-
-Let $$V_H$$ be the "true" human value function — the function we would use if we had unlimited time to deliberate, perfect knowledge of our preferences and their sources, and complete information about the consequences of all actions. What is $$K(V_H)$$?
-
-There is a credible argument that $$K(V_H)$$ is very small. The complexity of human values might be captured by a short program — something like "simulate the preferences of a fully-informed, reflectively coherent human, taking into account their values and the values they would endorse on reflection." This is a short description, even if the computation it specifies is intractable.
-
-But $$K_t(V_H)$$ — the time-bounded Kolmogorov complexity — is almost certainly very large. Evaluating $$V_H$$ on a state requires simulating the reflective deliberation of a human, which involves arbitrary cognitive processes, access to long chains of inference, and possibly solving problems that are computationally hard.
-
-The gap between $$K(V_H)$$ and $$K_t(V_H)$$ is the gap between what human values *are* (a compact abstract specification) and what they *require* to evaluate (astronomical computation). A learner that minimizes Kolmogorov complexity will converge to something close to $$V_H$$ in description; a learner that minimizes Kt complexity will converge to a computationally tractable proxy. These are not the same function.
-
-This is the algorithmic information-theoretic version of **inner alignment failure**: the model that optimizes the training objective (minimizing description length) may not be the model that executes the intended behavior (evaluating $$V_H$$ correctly), because the two correspond to different complexity measures.
-
----
-
-## Philosophical Conclusions
-
-The journey from Kolmogorov complexity through Solomonoff induction to the Löbian obstacle leads to three philosophical conclusions that are, in the precise technical sense, hard.
-
-**The undecidability of value grounding.** There is no Turing-computable procedure that, given a description of human behavior, converges to the human's true value function. The reward identification problem has no computable solution in full generality. Value learning is, at its core, an undecidable problem. What we can do is approximate it for specific restricted classes of value functions, with error bounds that depend on the Kolmogorov complexity of the true values.
-
-**The incompleteness of self-knowledge.** No sufficiently powerful agent can, in general, verify that its own value function accurately reflects its designer's intentions. The Löbian obstacle prevents self-referential verification. This does not mean that agents cannot behave aligned — it means that any alignment guarantee must be certified externally, by a verifier whose formal system is stronger than the agent's. This is a precise mathematical statement of the necessity of oversight.
-
-**The tractability barrier.** Even given a correct value function in Kolmogorov sense, evaluating it may be computationally intractable (high Kt complexity). All practical aligned agents must use approximations that are tractable but imperfect. The alignment gap — the difference between the optimal value function and the implementable proxy — is lower bounded by the complexity gap $$K_t(V_H) - K(V_H)$$. Making this gap small requires either simplifying human values (compression at the cost of fidelity) or improving computational efficiency (tractable approximations at the cost of correctness). There is no free lunch.
-
-These results do not imply that alignment is impossible. They imply that it is not a problem that can be solved once and for all by a sufficiently clever algorithm. It is instead a problem requiring continuous, computationally-bounded approximation, external verification, and the humility to treat all current alignment mechanisms as necessarily incomplete. The mathematics of algorithmic information theory has told us, with the precision of formal proof, what kind of problem we are facing. The appropriate response is not despair but clarity: we are building approximations in an undecidable problem space, and the approximations must be good enough in the measures that matter, for the environments we expect to deploy in. The theory tells us this cannot be done in full generality. The practice must do it anyway.
+None of these conclusions surprise practitioners of AI safety. They are familiar intuitions, grounded in empirical observations about reward hacking, goal misgeneralization, and the difficulty of scalable oversight. What algorithmic information theory adds is precision: these are not worries about current techniques but theorems about the structure of any computable aligned agent. The mathematics does not tell us how to solve the problem. But it tells us, with the clarity of formal proof, exactly what the problem is. That is the first step toward solving it.
