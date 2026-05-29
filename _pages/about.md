@@ -7,7 +7,7 @@ redirect_from:
   - /about.html
 ---
 
-AI/ML Engineer with production experience building LLM-powered systems, RAG pipelines, and multi-agent frameworks across healthcare, sports analytics, and AI safety research. I deploy end-to-end on AWS and GCP, care about correctness, and move fast. Currently finishing an MS in Applied Statistics (ML specialization) at NYU.
+AI/ML Engineer with production experience building LLM-powered systems, RAG pipelines, and multi-agent frameworks across healthcare, sports analytics, and AI safety research. Currently finishing an MS in Applied Statistics (ML specialization) at NYU.
 
 ## Research Interests
 
