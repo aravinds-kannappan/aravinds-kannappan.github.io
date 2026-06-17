@@ -32,6 +32,12 @@ In every one of these cases the proof is valid. The whole apparatus looks correc
 
 It helps to name the two properties a good spec needs. A spec is **sound** if it never rejects a correct answer, and it is **complete** if it never accepts a wrong one. Too-tight specs violate soundness. Too-loose and vacuous specs violate completeness. A spec that is both sound and complete is the one you actually wanted: it draws the line in exactly the right place, admitting every correct answer and excluding every incorrect one.
 
+To make this precise, let $O$ be the space of candidate outputs and let $C \subseteq O$ be the set of outputs that are actually correct, the thing that lives in your head. A specification $S$ induces an accepted set
+
+$$A_S = \{\, o \in O : S(o)\ \text{holds} \,\}.$$
+
+The two properties are then just two set inclusions. Soundness is $C \subseteq A_S$: every correct output is accepted. Completeness is $A_S \subseteq C$: every accepted output is correct. A faithful spec is the equality $A_S = C$, and the three failure modes are three ways that equality can break. A too-loose spec has $C \subsetneq A_S$, accepting everything correct and then some. A too-tight spec has $A_S \not\supseteq C$, rejecting some correct output. A vacuous spec is the extreme $A_S = O$, accepting everything. The proof checker, meanwhile, only ever establishes a judgment of the form $P \vdash S$, that the proof $P$ discharges the statement $S$. Nowhere in that judgment does $C$ appear. The checker cannot relate $A_S$ to $C$, because $C$ was never written down. That is the blind spot stated in symbols.
+
 The reason this matters in practice is that writing a sound and complete spec turns out to be harder than writing correct code. On Verina, a benchmark of programming tasks where each task ships with both code and a formal specification, the best general model writes code that is correct about 73 percent of the time, but writes specifications that are both sound and complete only about 52 percent of the time. Read that again, because it is the crux. The model is better at solving the problem than at saying what the problem is. The specification, not the implementation, is the weaker link, and it is precisely the link a proof checker is blind to.
 
 This should not be surprising once you sit with it. Code has a behavior you can run, test, and watch fail. A specification is a claim about all possible behaviors at once, and the failure modes are subtractive: a missing clause, a dropped assumption, a quantifier in the wrong place. Nothing crashes. Nothing throws. The spec just quietly means less, or means something adjacent to what you intended, and every downstream proof inherits the error while looking impeccable.
@@ -88,6 +94,26 @@ The **code engine** handles specifications of programs, where the question is wh
 
 ---
 
+## How often will sampling catch a bug?
+
+The math engine's guarantee is probabilistic, and it is worth writing down exactly, because it explains the draws sweep that comes later. Take a universally quantified statement $\forall x \in D,\ \varphi(x)$ and let
+
+$$V = \{\, x \in D : \neg\,\varphi(x) \,\}$$
+
+be its violating set, the inputs on which the statement is false. Let $\varepsilon = \Pr_{x \sim \mathcal{D}}[\,x \in V\,]$ be the probability that a single draw from the sampling distribution $\mathcal{D}$ lands in $V$. A faithful statement has $V = \varnothing$ and $\varepsilon = 0$; a broken statement has $\varepsilon > 0$, however small.
+
+With $n$ independent draws, the probability that the engine fails to hit the violating set even once is
+
+$$\Pr[\text{miss}] = (1 - \varepsilon)^n \le e^{-n\varepsilon},$$
+
+so the probability of catching the bug, $1 - (1-\varepsilon)^n$, rises toward one geometrically in $n$. Inverting the bound, to catch a violation with probability at least $1 - \delta$ it suffices to draw
+
+$$n \ge \frac{\ln(1/\delta)}{\varepsilon}.$$
+
+This single inequality is the whole story behind the sweep. A blatant bug with $\varepsilon \approx 10^{-1}$ is caught almost surely in a handful of draws. A subtle bug that fails on one input in ten thousand has $\varepsilon \approx 10^{-4}$, so at $n = 2000$ the miss probability is $e^{-0.2} \approx 0.82$ per statement, which is exactly why a couple of those slip through at that budget. Push $n$ to $10^4$ and the expected number of hits $n\varepsilon \approx 1$ crosses into reliable territory; push to $5 \times 10^4$ and $\Pr[\text{miss}] = e^{-5} \approx 0.7\%$. The method never proves $\varepsilon = 0$. It only drives the miss probability down at a known, controllable rate, which is the honest meaning of a FAITHFUL verdict: $\varepsilon$ is small enough that $n$ draws found nothing.
+
+---
+
 ## The counterexample is the repair signal
 
 A pass-or-fail bit tells you that something is wrong. A counterexample tells you what is wrong, and that difference is what turns Popper from a critic into a collaborator. When the engine hands back the exact input that breaks a spec, that input doubles as a repair hint, because it points straight at the missing clause or the flipped direction. Popper's repair loop takes the witness, adjusts the statement, and checks again, iterating until the statement holds up or the budget runs out.
@@ -98,7 +124,7 @@ max_lower_bound_only  INCOMPLETE -> FAITHFUL   (also require out in {a, b})
 abs_strictly_positive UNSOUND    -> FAITHFUL   (relax > 0 to >= 0 for abs(0))
 ```
 
-Read these as before-and-after stories. The first spec defined sorting by length alone, which is vacuous; the repair adds the two clauses sorting actually needs, that the output is ordered and is a permutation of the input. The second spec required only that the maximum be a lower bound on both arguments, which is incomplete; the repair also requires the output to actually be one of the two values. The third spec demanded a strictly positive absolute value, which is unsound because it rejects `abs(0) = 0`; the repair relaxes the inequality. In each case the counterexample is not just a complaint, it is the diff.
+There is a clean way to picture the repair. Order specifications by logical strength, writing $S' \le S$ when $S'$ implies $S$, so a stronger spec accepts a smaller set. This makes specs a partial order, in fact a lattice under conjunction and disjunction, and the accepted sets move monotonically: strengthening shrinks $A_S$ toward $C$ from above, weakening grows it toward $C$ from below. An UNSOUND spec sits with $A_S$ too small in some direction and gets weakened along exactly the axis the counterexample names; an INCOMPLETE or VACUOUS spec sits with $A_S$ too large and gets strengthened. Each repair is a single, witness-directed step in that lattice toward the target $A_S = C$. The first spec defined sorting by length alone, which is vacuous, so the repair conjoins the two clauses sorting actually needs, ordering and permutation. The second required only that the maximum be a lower bound on both arguments, so the repair conjoins membership. The third demanded a strictly positive absolute value, so the repair weakens the inequality. The counterexample is not just a complaint, it is the diff.
 
 ---
 
@@ -114,7 +140,7 @@ I wanted a measurement, not just an argument, so I built a benchmark of 346 stat
 
 The proof checker catches none of the bad specs, and that is the headline, not an embarrassment. Every spec in the set is valid as far as the proof is concerned, so catching a bad spec is simply not a thing a proof checker does. Pointing it at this benchmark is like asking a spell-checker to catch a factual error: correct spelling, wrong fact, and the tool has nothing to say. The LLM judge, a model that reads the spec and guesses whether it is faithful, can sometimes be right, but it never hands you the input that breaks the spec, so even when it guesses correctly it cannot show its work or drive a repair.
 
-The two specs Popper misses are worth being honest about, because they reveal exactly where the method's edge is. They are the rarest subtle bugs, ones that fail on roughly one input in ten thousand. At a sampling budget of two thousand draws, the Monte-Carlo engine sometimes does not happen to hit the bad input. The fix is not a different algorithm, it is more draws, and the benchmark records this as a sweep:
+The two specs Popper misses are exactly the rare-event regime the bound above predicts: subtle bugs with $\varepsilon \approx 10^{-4}$ that the sampler does not happen to hit at two thousand draws. The fix is not a different algorithm, it is a larger $n$, and the benchmark records this as a sweep:
 
 | draws per statement | math recall | subtle bugs caught |
 |---|---|---|
@@ -124,7 +150,7 @@ The two specs Popper misses are worth being honest about, because they reveal ex
 | 10,000 | 100% | 10/10 |
 | 50,000 | 100% | 10/10 |
 
-The trend is exactly what you would expect from a sampler: rare events get caught once you draw enough samples to hit them. By ten thousand draws the engine catches everything, including the one-in-ten-thousand bugs, and the cost is still trivial compared to a proof search. This is the honest shape of a Monte-Carlo method, and I would rather show the curve than quote the single number that flatters the tool.
+The trend is exactly the $1 - e^{-n\varepsilon}$ curve: rare events get caught once $n\varepsilon$ exceeds one. By ten thousand draws the engine catches everything, including the one-in-ten-thousand bugs, and the cost is still trivial compared to a proof search. This is the honest shape of a Monte-Carlo method, and I would rather show the curve than quote the single number that flatters the tool.
 
 ---
 
@@ -140,4 +166,4 @@ Seeing AXLE on its own is the instructive part. It can refute a false claim when
 
 ## A note on honesty
 
-Popper breaks statements; it does not certify them. A FAITHFUL verdict means it could not find a counterexample within its budget, not that none exists. Proving that no counterexample exists is undecidable in general, so I do not claim it, and I built the INCONCLUSIVE verdict precisely so the tool can admit when it cannot decide rather than guess. What Popper does catch is the common, real failure that the 52-percent number is made of: a dropped assumption, a flipped direction, a spec that is too loose or too tight or says nothing at all. Lean and AXLE remain the final word on the proof itself. Popper just makes sure that final word is spent on a statement worth proving, and when the statement is not worth proving, it hands you the concrete input that shows you why.
+Popper breaks statements; it does not certify them. A FAITHFUL verdict means it could not find a counterexample within its budget, not that none exists. In the language above, it means the estimated $\varepsilon$ is consistent with zero at the sample size used, not that $V = \varnothing$. Proving that no counterexample exists is undecidable in general, so I do not claim it, and I built the INCONCLUSIVE verdict precisely so the tool can admit when it cannot decide rather than guess. What Popper does catch is the common, real failure that the 52-percent number is made of: a dropped assumption, a flipped direction, a spec that is too loose or too tight or says nothing at all. Lean and AXLE remain the final word on the proof itself. Popper just makes sure that final word is spent on a statement worth proving, and when the statement is not worth proving, it hands you the concrete input that shows you why.
