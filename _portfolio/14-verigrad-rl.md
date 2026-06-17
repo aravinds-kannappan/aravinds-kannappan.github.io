@@ -1,6 +1,6 @@
 ---
 title: "VeriGrad RL: Mechanistic Interpretability for Safety RL"
-excerpt: "An open-source mechanistic interpretability and AI-safety lab for RL post-training — train policies to choose activation-level interventions, then verify they're behaviorally safe, useful, and mechanistically faithful."
+excerpt: "An open-source mechanistic interpretability and AI-safety lab for RL post-training: train policies to choose activation-level interventions, then verify they're behaviorally safe, useful, and mechanistically faithful."
 collection: portfolio
 date: 2026-06-10
 ---
