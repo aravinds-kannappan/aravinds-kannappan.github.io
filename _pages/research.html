@@ -1,0 +1,15 @@
+---
+layout: archive
+title: "Research"
+permalink: /research/
+author_profile: true
+---
+
+{% include base_path %}
+
+<p>These are deep technical readings of AI safety papers I have spent time with, written in my own words. I work through the core math where there is any, sketch the mechanism with a diagram, and end each one with my honest take on what the paper gets right and where I think it is thin. The rough map: mechanistic interpretability (how to open the box), oversight and forecasting (how to measure and supervise capability), and propensity and misalignment (what models are inclined to do, not just what they can do).</p>
+
+{% assign research_items = site.research | sort: 'order' %}
+{% for post in research_items %}
+  {% include archive-single.html %}
+{% endfor %}
