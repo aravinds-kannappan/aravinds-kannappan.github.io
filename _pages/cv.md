@@ -39,16 +39,18 @@ redirect_from:
 - Built statistical analysis over response distributions including Likert histograms, cross-model EDA, and semantic analysis of chain-of-thought justifications across 50+ safety-relevant indicators
 - Open-sourced full evaluation framework on GitHub for reproducible AI safety research
 
-**Software Engineer, AI/ML** — Replays AI
+**Software Engineer, AI/ML** — Replays AI | Top 10% of YC Applicants
 *Sep 2025 – Apr 2026 · New York, NY*
+- Scaled Replays AI to 1,000 customers and achieved $20K in annual recurring revenue (ARR).
 - Designed ingestion pipeline writing 5M+ structured play-by-play events into PostgreSQL as system of record; stored raw video in GCP referenced by pointer, cutting compute costs by 40%
 - Preprocessed using Python to handle schema validation, player disambiguation, and deduplication; anchored video segmentation to event timestamps before Computer Vision inference
 - Orchestrated 3 parallel agentic inference pipelines spanning event feature extraction, CV play classification, and task-split LLM summarization; reduced inference latency by 35%
 - Decoupled storage and inference from the frontend using REST APIs; implemented recap caching sustaining sub-second response times
 - Built React and TypeScript mobile app rendering live rankings, game recaps, and CV-scored highlight reels; reduced mean load time by 28% via component memoization
 
-**Founder & ML Engineer** — Synthure \| Care Clarity AI
+**Founder & ML Engineer** — Synthure \| Care Clarity AI | Top 10% of YC Applicants
 *Jul 2023 – Jul 2025 · New York, NY*
+- Collaborated with Epic as a pilot/design partner and held discussions with investors.
 - Built RAG retrieval pipeline over Snowflake for medical code classification and claim denial routing; reduced policy misinterpretation errors by 94% across production clinical workflows
 - Engineered typed intermediate representation and data quality gate validating schema, deduplication, and entity extraction confidence before downstream inference
 - Designed multi-agent orchestration with task-split LLM routing using Claude APIs; directed high-volume entity tagging to lighter models and plain-language generation to frontier LLMs
@@ -84,3 +86,4 @@ redirect_from:
 **Frontend:** React, REST APIs
 
 **Cloud & DevOps:** AWS (S3, EC2, Bedrock), GCP, Docker, Kubernetes, CI/CD, Git, PostgreSQL, MongoDB, Redis, Snowflake
+
